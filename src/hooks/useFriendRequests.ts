@@ -203,14 +203,25 @@ export function useFriendRequests(userAddress: Address | null) {
           // Don't fail, just continue
         }
 
-        const existingRequest = existingRequests?.[0];
-        if (existingRequest) {
-          if (existingRequest.status === "pending") {
-            setError("Friend request already pending");
-          } else {
-            setError("A request already exists between you");
-          }
+        console.log("[sendFriendRequest] Existing requests found:", existingRequests);
+
+        // Only block if there's a pending request
+        const pendingRequest = existingRequests?.find(r => r.status === "pending");
+        if (pendingRequest) {
+          setError("Friend request already pending");
           return false;
+        }
+
+        // Delete any old rejected/accepted requests to allow fresh start
+        const oldRequests = existingRequests?.filter(r => r.status !== "pending");
+        if (oldRequests && oldRequests.length > 0) {
+          console.log("[sendFriendRequest] Cleaning up old requests...");
+          for (const req of oldRequests) {
+            await supabase
+              .from("shout_friend_requests")
+              .delete()
+              .eq("id", req.id);
+          }
         }
 
         // Ensure user exists

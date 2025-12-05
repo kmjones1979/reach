@@ -12,6 +12,8 @@ import { FriendRequests } from "./FriendRequests";
 import { AddFriendModal } from "./AddFriendModal";
 import { VoiceCallUI } from "./VoiceCallUI";
 import { IncomingCallModal } from "./IncomingCallModal";
+import { ChatModal } from "./ChatModal";
+import { XMTPProvider, useXMTPContext } from "@/context/XMTPProvider";
 import { isAgoraConfigured } from "@/config/agora";
 
 type DashboardProps = {
@@ -30,9 +32,10 @@ type FriendsListFriend = {
   isOnline?: boolean;
 };
 
-export function Dashboard({ userAddress, onLogout }: DashboardProps) {
+function DashboardContent({ userAddress, onLogout }: DashboardProps) {
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
   const [currentCallFriend, setCurrentCallFriend] = useState<FriendsListFriend | null>(null);
+  const [chatFriend, setChatFriend] = useState<FriendsListFriend | null>(null);
   const [userENS, setUserENS] = useState<{ ensName: string | null; avatar: string | null }>({
     ensName: null,
     avatar: null,
@@ -88,6 +91,13 @@ export function Dashboard({ userAddress, onLogout }: DashboardProps) {
     rejectCall,
     endCall: endCallSignaling,
   } = useCallSignaling(userAddress);
+
+  const {
+    isInitialized: isXMTPInitialized,
+    isInitializing: isXMTPInitializing,
+    error: xmtpError,
+    initialize: initializeXMTP,
+  } = useXMTPContext();
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -157,6 +167,10 @@ export function Dashboard({ userAddress, onLogout }: DashboardProps) {
 
   const handleRemoveFriend = async (friendId: string) => {
     await removeFriend(friendId);
+  };
+
+  const handleChat = (friend: FriendsListFriend) => {
+    setChatFriend(friend);
   };
 
   return (
@@ -296,6 +310,88 @@ export function Dashboard({ userAddress, onLogout }: DashboardProps) {
             </motion.div>
           )}
 
+          {/* XMTP Status Banner */}
+          {!isXMTPInitialized && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 bg-blue-500/10 border border-blue-500/30 rounded-xl p-4"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-start gap-3">
+                  <svg
+                    className="w-5 h-5 text-blue-400 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                  <div>
+                    <p className="text-blue-200 font-medium">Enable XMTP Chat</p>
+                    <p className="text-blue-200/70 text-sm mt-1">
+                      Sign a message to enable encrypted messaging. Your friends also need to enable XMTP to chat.
+                    </p>
+                    {xmtpError && (
+                      <p className="text-red-400 text-sm mt-1">{xmtpError}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={initializeXMTP}
+                  disabled={isXMTPInitializing}
+                  className="py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isXMTPInitializing ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Signing...
+                    </>
+                  ) : (
+                    "Enable Chat"
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* XMTP Enabled Success */}
+          {isXMTPInitialized && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-6 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4"
+            >
+              <div className="flex items-center gap-3">
+                <svg
+                  className="w-5 h-5 text-emerald-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <p className="text-emerald-200 font-medium">
+                  XMTP Chat Enabled! You can now send and receive encrypted messages.
+                </p>
+              </div>
+            </motion.div>
+          )}
+
           {/* Friend Requests Section */}
           {(incomingRequests.length > 0 || outgoingRequests.length > 0) && (
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
@@ -348,6 +444,7 @@ export function Dashboard({ userAddress, onLogout }: DashboardProps) {
               <FriendsList
                 friends={friendsListData}
                 onCall={handleCall}
+                onChat={handleChat}
                 onRemove={handleRemoveFriend}
                 isCallActive={callState !== "idle"}
               />
@@ -428,6 +525,25 @@ export function Dashboard({ userAddress, onLogout }: DashboardProps) {
           onReject={handleRejectCall}
         />
       )}
+
+      {/* Chat Modal */}
+      <ChatModal
+        isOpen={!!chatFriend}
+        onClose={() => setChatFriend(null)}
+        userAddress={userAddress}
+        peerAddress={chatFriend?.address || ("0x" as Address)}
+        peerName={chatFriend?.ensName || chatFriend?.nickname}
+        peerAvatar={chatFriend?.avatar}
+      />
     </>
+  );
+}
+
+// Wrapper that provides XMTP context
+export function Dashboard({ userAddress, onLogout }: DashboardProps) {
+  return (
+    <XMTPProvider userAddress={userAddress}>
+      <DashboardContent userAddress={userAddress} onLogout={onLogout} />
+    </XMTPProvider>
   );
 }

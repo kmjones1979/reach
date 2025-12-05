@@ -17,6 +17,7 @@ export type Friend = {
 type FriendsListProps = {
   friends: Friend[];
   onCall: (friend: Friend) => void;
+  onChat: (friend: Friend) => void;
   onRemove: (friendId: string) => void;
   isCallActive: boolean;
 };
@@ -24,6 +25,7 @@ type FriendsListProps = {
 export function FriendsList({
   friends,
   onCall,
+  onChat,
   onRemove,
   isCallActive,
 }: FriendsListProps) {
@@ -121,6 +123,27 @@ export function FriendsList({
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
+                  {/* Chat Button */}
+                  <button
+                    onClick={() => onChat(friend)}
+                    className="w-10 h-10 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 flex items-center justify-center transition-colors"
+                    title="Chat via XMTP"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      />
+                    </svg>
+                  </button>
+
                   {/* Call Button */}
                   <button
                     onClick={() => onCall(friend)}

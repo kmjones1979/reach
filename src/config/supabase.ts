@@ -16,3 +16,5 @@ export const supabase = supabaseUrl && supabaseAnonKey
 export const isSupabaseConfigured = !!supabase;
 
 
+
+
