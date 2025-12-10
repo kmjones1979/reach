@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { type Address } from "viem";
+import { supabase, isSupabaseConfigured } from "@/config/supabase";
 
 export type Friend = {
   id: string;
@@ -13,6 +14,12 @@ export type Friend = {
   shoutUsername: string | null;
   addedAt: string;
   isOnline?: boolean;
+};
+
+type FriendStatus = {
+  emoji: string;
+  text: string;
+  isDnd: boolean;
 };
 
 type FriendsListProps = {
@@ -39,6 +46,72 @@ export function FriendsList({
   friendsXMTPStatus = {},
 }: FriendsListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [friendStatuses, setFriendStatuses] = useState<Record<string, FriendStatus>>({});
+
+  // Fetch friend statuses
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || friends.length === 0) return;
+
+    const fetchStatuses = async () => {
+      if (!supabase) return;
+      
+      const addresses = friends.map(f => f.address.toLowerCase());
+      
+      const { data, error } = await supabase
+        .from("shout_user_settings")
+        .select("wallet_address, status_emoji, status_text, is_dnd")
+        .in("wallet_address", addresses);
+
+      if (error) {
+        console.error("[FriendsList] Error fetching statuses:", error);
+        return;
+      }
+
+      if (data) {
+        const statuses: Record<string, FriendStatus> = {};
+        data.forEach((row) => {
+          statuses[row.wallet_address] = {
+            emoji: row.status_emoji || "💬",
+            text: row.status_text || "",
+            isDnd: row.is_dnd || false,
+          };
+        });
+        setFriendStatuses(statuses);
+      }
+    };
+
+    fetchStatuses();
+
+    // Subscribe to realtime updates
+    const channel = supabase
+      ?.channel("friend-statuses")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "shout_user_settings",
+        },
+        (payload) => {
+          const newData = payload.new as any;
+          if (newData && friends.some(f => f.address.toLowerCase() === newData.wallet_address)) {
+            setFriendStatuses(prev => ({
+              ...prev,
+              [newData.wallet_address]: {
+                emoji: newData.status_emoji || "💬",
+                text: newData.status_text || "",
+                isDnd: newData.is_dnd || false,
+              },
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (channel) supabase?.removeChannel(channel);
+    };
+  }, [friends]);
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -136,14 +209,33 @@ export function FriendsList({
 
                   {/* Info */}
                   <div className="flex-1 min-w-0 mr-1">
-                    <p className="text-white font-medium truncate text-sm sm:text-base">
-                      {getDisplayName(friend)}
-                    </p>
-                    {getSecondaryText(friend) && (
+                    <div className="flex items-center gap-1.5">
+                      {/* Status emoji */}
+                      {friendStatuses[friend.address.toLowerCase()] && (
+                        <span className="text-sm flex-shrink-0" title={friendStatuses[friend.address.toLowerCase()].text || "Status"}>
+                          {friendStatuses[friend.address.toLowerCase()].emoji}
+                        </span>
+                      )}
+                      <p className="text-white font-medium truncate text-sm sm:text-base">
+                        {getDisplayName(friend)}
+                      </p>
+                      {/* DND badge */}
+                      {friendStatuses[friend.address.toLowerCase()]?.isDnd && (
+                        <span className="flex-shrink-0 text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">
+                          DND
+                        </span>
+                      )}
+                    </div>
+                    {/* Status text or secondary info */}
+                    {friendStatuses[friend.address.toLowerCase()]?.text ? (
+                      <p className="text-zinc-400 text-xs sm:text-sm truncate">
+                        {friendStatuses[friend.address.toLowerCase()].text}
+                      </p>
+                    ) : getSecondaryText(friend) ? (
                       <p className="text-zinc-500 text-xs sm:text-sm truncate">
                         {getSecondaryText(friend)}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 </button>
 
