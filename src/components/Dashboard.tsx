@@ -53,6 +53,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   const xmtpAutoInitAttempted = useRef(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   
+  
   // iOS Chrome detection (Chrome on iOS doesn't support WebRTC properly)
   const [isIOSChrome, setIsIOSChrome] = useState(false);
   const [dismissIOSWarning, setDismissIOSWarning] = useState(false);
@@ -149,10 +150,12 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
 
   const {
     incomingCall,
+    remoteHangup,
     startCall,
     acceptCall,
     rejectCall,
     endCall: endCallSignaling,
+    clearRemoteHangup,
   } = useCallSignaling(userAddress);
 
   const {
@@ -315,6 +318,16 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   const handleRejectCall = async () => {
     await rejectCall();
   };
+
+  // Handle when the other party hangs up
+  useEffect(() => {
+    if (remoteHangup) {
+      console.log("[Dashboard] Remote party hung up - leaving call");
+      leaveCall();
+      setCurrentCallFriend(null);
+      clearRemoteHangup();
+    }
+  }, [remoteHangup, leaveCall, clearRemoteHangup]);
 
   const handleEndCall = async () => {
     await leaveCall();

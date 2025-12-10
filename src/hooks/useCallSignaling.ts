@@ -16,6 +16,8 @@ export type CallSignal = {
 export function useCallSignaling(userAddress: Address | null) {
   const [incomingCall, setIncomingCall] = useState<CallSignal | null>(null);
   const [outgoingCall, setOutgoingCall] = useState<CallSignal | null>(null);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [remoteHangup, setRemoteHangup] = useState(false); // True when other party ended the call
 
   // Listen for incoming calls
   useEffect(() => {
@@ -67,13 +69,19 @@ export function useCallSignaling(userAddress: Address | null) {
         },
         (payload) => {
           const updated = payload.new as CallSignal;
-          console.log("[CallSignaling] Call updated:", updated);
+          console.log("[CallSignaling] Call updated (as callee):", updated);
           if (updated.status !== "ringing") {
             setIncomingCall(null);
           }
+          // If the call we're in was ended by the caller
+          if (updated.status === "ended") {
+            console.log("[CallSignaling] Call ended by caller!");
+            setActiveCallId(null);
+            setRemoteHangup(true);
+          }
         }
       )
-      // Also listen for updates to outgoing calls (when callee accepts/rejects)
+      // Also listen for updates to outgoing calls (when callee accepts/rejects/ends)
       .on(
         "postgres_changes",
         {
@@ -86,10 +94,15 @@ export function useCallSignaling(userAddress: Address | null) {
           const updated = payload.new as CallSignal;
           console.log("[CallSignaling] Outgoing call updated:", updated);
           if (updated.status === "accepted") {
-            // Callee accepted - we're already in the call
+            // Callee accepted - track the active call
             setOutgoingCall(null);
+            setActiveCallId(updated.id);
           } else if (updated.status === "rejected" || updated.status === "ended") {
+            // Call ended/rejected by the other party
+            console.log("[CallSignaling] Call ended/rejected by callee!");
             setOutgoingCall(null);
+            setActiveCallId(null);
+            setRemoteHangup(true);
           }
         }
       )
@@ -161,7 +174,9 @@ export function useCallSignaling(userAddress: Address | null) {
     }
 
     const channelName = incomingCall.channel_name;
+    const callId = incomingCall.id;
     setIncomingCall(null);
+    setActiveCallId(callId); // Track the active call
     return channelName;
   }, [incomingCall]);
 
@@ -196,6 +211,7 @@ export function useCallSignaling(userAddress: Address | null) {
 
     setIncomingCall(null);
     setOutgoingCall(null);
+    setActiveCallId(null);
   }, [userAddress]);
 
   // Cancel outgoing call
@@ -212,14 +228,22 @@ export function useCallSignaling(userAddress: Address | null) {
     setOutgoingCall(null);
   }, [outgoingCall]);
 
+  // Clear the remote hangup flag (call this after handling it)
+  const clearRemoteHangup = useCallback(() => {
+    setRemoteHangup(false);
+  }, []);
+
   return {
     incomingCall,
     outgoingCall,
+    activeCallId,
+    remoteHangup,
     startCall,
     acceptCall,
     rejectCall,
     endCall,
     cancelCall,
+    clearRemoteHangup,
     isConfigured: isSupabaseConfigured,
   };
 }
