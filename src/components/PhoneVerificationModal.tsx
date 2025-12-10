@@ -30,9 +30,14 @@ export function PhoneVerificationModal({
     codeExpiresAt,
     sendCode,
     verifyCode,
+    removePhone,
+    startChangeNumber,
     reset,
     clearError,
   } = usePhoneVerification(userAddress);
+  
+  const [isChangingNumber, setIsChangingNumber] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   // Focus code input when code is sent
   useEffect(() => {
@@ -48,6 +53,8 @@ export function PhoneVerificationModal({
         reset();
       }
       setCodeInput("");
+      setIsChangingNumber(false);
+      setIsRemoving(false);
       clearError();
     }
   }, [isOpen, isVerified, reset, clearError]);
@@ -145,23 +152,90 @@ export function PhoneVerificationModal({
               </div>
 
               {/* Already verified state */}
-              {isVerified && (
-                <div className="text-center py-6">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+              {isVerified && !isChangingNumber && (
+                <div className="space-y-6">
+                  <div className="text-center py-4">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <p className="text-lg text-white font-medium mb-2">Phone Number Verified</p>
+                    <p className="text-zinc-400 font-mono">{phoneNumber}</p>
                   </div>
-                  <p className="text-lg text-white font-medium mb-2">Phone Number Verified</p>
-                  <p className="text-zinc-400">{phoneNumber}</p>
+                  
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="bg-red-500/10 border border-red-500/30 rounded-xl p-3"
+                      >
+                        <p className="text-red-400 text-sm">{error}</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setIsChangingNumber(true);
+                        setPhoneInput("");
+                        startChangeNumber();
+                      }}
+                      className="flex-1 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-medium transition-colors"
+                    >
+                      Change Number
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setIsRemoving(true);
+                        const success = await removePhone();
+                        setIsRemoving(false);
+                        if (success) {
+                          onClose();
+                        }
+                      }}
+                      disabled={isRemoving}
+                      className="flex-1 py-3 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-medium transition-colors disabled:opacity-50"
+                    >
+                      {isRemoving ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Removing...
+                        </span>
+                      ) : (
+                        "Remove"
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
 
               {/* Phone input form */}
-              {!isVerified && state !== "sent" && state !== "verifying" && state !== "verified" && (
+              {((!isVerified && state !== "sent" && state !== "verifying" && state !== "verified") || isChangingNumber) && (
                 <form onSubmit={handleSendCode} className="space-y-4">
+                  {isChangingNumber && (
+                    <button
+                      type="button"
+                      onClick={() => setIsChangingNumber(false)}
+                      className="flex items-center gap-1 text-zinc-400 hover:text-white text-sm transition-colors mb-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Back
+                    </button>
+                  )}
                   <p className="text-zinc-400 text-sm">
-                    Verify your phone number to let friends find you. We&apos;ll send a 6-digit code via SMS.
+                    {isChangingNumber 
+                      ? "Enter your new phone number. We'll send a 6-digit verification code via SMS."
+                      : "Verify your phone number to let friends find you. We'll send a 6-digit code via SMS."
+                    }
                   </p>
 
                   <div>

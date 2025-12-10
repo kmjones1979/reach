@@ -166,11 +166,60 @@ export function usePhoneVerification(userAddress: Address | null) {
     }
   }, []);
 
-  // Reset state
+  // Remove phone number
+  const removePhone = useCallback(async (): Promise<boolean> => {
+    if (!userAddress) {
+      setError("Wallet not connected");
+      return false;
+    }
+
+    setState("sending"); // Reuse sending state for loading indicator
+    setError(null);
+
+    try {
+      const response = await fetch("/api/phone/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: userAddress,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Failed to remove phone number");
+        setState("verified"); // Go back to verified state
+        return false;
+      }
+
+      // Clear local state
+      setPhoneNumber(null);
+      setIsVerified(false);
+      setState("idle");
+      setCodeExpiresAt(null);
+      return true;
+    } catch (err) {
+      console.error("[usePhoneVerification] Remove phone error:", err);
+      setError("Failed to remove phone number. Please try again.");
+      setState("verified");
+      return false;
+    }
+  }, [userAddress]);
+
+  // Reset state (for changing number)
   const reset = useCallback(() => {
     setState("idle");
     setError(null);
     setCodeExpiresAt(null);
+  }, []);
+
+  // Start change number flow (resets verified status locally to show input)
+  const startChangeNumber = useCallback(() => {
+    setState("idle");
+    setError(null);
+    setCodeExpiresAt(null);
+    // Don't clear phoneNumber or isVerified - they'll update after new verification
   }, []);
 
   // Clear error
@@ -186,6 +235,8 @@ export function usePhoneVerification(userAddress: Address | null) {
     sendCode,
     verifyCode,
     lookupByPhone,
+    removePhone,
+    startChangeNumber,
     reset,
     clearError,
   };
