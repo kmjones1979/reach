@@ -21,7 +21,9 @@ import { XMTPProvider, useXMTPContext } from "@/context/XMTPProvider";
 import { useUsername } from "@/hooks/useUsername";
 import { usePhoneVerification } from "@/hooks/usePhoneVerification";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { isAgoraConfigured } from "@/config/agora";
+import { StatusModal } from "./StatusModal";
 
 type DashboardProps = {
   userAddress: Address;
@@ -99,6 +101,15 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     notifyCallConnected,
     notifyCallEnded,
   } = useNotifications();
+
+  // User settings (status, DND, sound)
+  const {
+    settings: userSettings,
+    setStatus,
+    toggleDnd,
+    toggleSound,
+  } = useUserSettings(userAddress);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   const { resolveAddressOrENS } = useENS();
   
@@ -278,15 +289,25 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     return () => document.removeEventListener("click", handleInteraction);
   }, [notificationPermission, requestNotificationPermission]);
 
-  // Play ring sound for incoming calls
+  // Handle incoming calls - DND auto-rejects, otherwise ring if sound enabled
   useEffect(() => {
     if (incomingCall && callState === "idle") {
-      const callerName = incomingCallFriend?.ensName || incomingCallFriend?.nickname || "Someone";
-      startRinging(callerName);
+      // Auto-reject if DND is enabled
+      if (userSettings.isDnd) {
+        console.log("[Dashboard] DND enabled - auto-rejecting call");
+        rejectCall();
+        return;
+      }
+      
+      // Play ring sound if enabled
+      if (userSettings.soundEnabled) {
+        const callerName = incomingCallFriend?.ensName || incomingCallFriend?.nickname || "Someone";
+        startRinging(callerName);
+      }
     } else {
       stopRinging();
     }
-  }, [incomingCall, callState, incomingCallFriend, startRinging, stopRinging]);
+  }, [incomingCall, callState, incomingCallFriend, startRinging, stopRinging, userSettings.isDnd, userSettings.soundEnabled, rejectCall]);
 
   // Listen for new messages and show toast + notification
   useEffect(() => {
@@ -299,8 +320,10 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
       );
       const senderName = friend?.ensName || friend?.nickname || formatAddress(senderAddress);
       
-      // Play sound and show browser notification
-      notifyMessage(senderName, content);
+      // Play sound and show browser notification (if sound enabled)
+      if (userSettings.soundEnabled) {
+        notifyMessage(senderName, content);
+      }
       
       // Show toast notification in-app
       setToast({
@@ -313,7 +336,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     });
     
     return unsubscribe;
-  }, [isXMTPInitialized, onNewMessage, friendsListData, notifyMessage]);
+  }, [isXMTPInitialized, onNewMessage, friendsListData, notifyMessage, userSettings.soundEnabled]);
 
   const handleSendFriendRequest = async (addressOrENS: string): Promise<boolean> => {
     return await sendFriendRequest(addressOrENS);
@@ -326,18 +349,43 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     }
 
     setCurrentCallFriend(friend);
-    notifyOutgoingCall(); // Play outgoing call sound
+    if (userSettings.soundEnabled) {
+      notifyOutgoingCall(); // Play outgoing call sound
+    }
     
     // Generate a unique channel name based on both addresses (sorted for consistency)
     const addresses = [userAddress.toLowerCase(), friend.address.toLowerCase()].sort();
     const channelName = `shout_${addresses[0].slice(2, 10)}_${addresses[1].slice(2, 10)}`;
     
     // Create signaling record to notify the callee
-    await startCall(friend.address, channelName);
+    const callRecord = await startCall(friend.address, channelName);
+    
+    if (!callRecord) {
+      console.error("[Dashboard] Failed to create call signaling record");
+      setCurrentCallFriend(null);
+      return;
+    }
+    
+    // Wait briefly to see if call was immediately rejected (DND auto-reject)
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Check if the call was rejected during the wait
+    if (remoteHangup) {
+      console.log("[Dashboard] Call was rejected (likely DND) - not joining Agora");
+      setCurrentCallFriend(null);
+      clearRemoteHangup();
+      // Show notification to caller
+      setToast({
+        sender: friend.ensName || friend.nickname || "Friend",
+        message: "is not available right now (Do Not Disturb)",
+      });
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
     
     // Join the Agora channel (with or without video)
     const success = await joinCall(channelName, undefined, withVideo);
-    if (success) {
+    if (success && userSettings.soundEnabled) {
       notifyCallConnected();
     }
   };
@@ -356,7 +404,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
       }
       // Join the Agora channel
       const success = await joinCall(channelName);
-      if (success) {
+      if (success && userSettings.soundEnabled) {
         notifyCallConnected();
       }
     }
@@ -371,15 +419,19 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   useEffect(() => {
     if (remoteHangup) {
       console.log("[Dashboard] Remote party hung up - leaving call");
-      notifyCallEnded();
+      if (userSettings.soundEnabled) {
+        notifyCallEnded();
+      }
       leaveCall();
       setCurrentCallFriend(null);
       clearRemoteHangup();
     }
-  }, [remoteHangup, leaveCall, clearRemoteHangup, notifyCallEnded]);
+  }, [remoteHangup, leaveCall, clearRemoteHangup, notifyCallEnded, userSettings.soundEnabled]);
 
   const handleEndCall = async () => {
-    notifyCallEnded();
+    if (userSettings.soundEnabled) {
+      notifyCallEnded();
+    }
     await leaveCall();
     await endCallSignaling();
     setCurrentCallFriend(null);
@@ -433,13 +485,17 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
                     className="text-left hover:opacity-80 transition-opacity"
                   >
                     <h1 className="text-white font-bold flex items-center gap-1">
+                      <span className="text-lg">{userSettings.statusEmoji}</span>
                       {userENS.ensName || (shoutUsername ? `@${shoutUsername}` : "Shout")}
+                      {userSettings.isDnd && (
+                        <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">DND</span>
+                      )}
                       <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </h1>
-                    <p className="text-zinc-500 text-sm font-mono">
-                      {formatAddress(userAddress)}
+                    <p className="text-zinc-500 text-sm">
+                      {userSettings.statusText || formatAddress(userAddress)}
                     </p>
                   </button>
 
@@ -453,13 +509,35 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
                         transition={{ duration: 0.15 }}
                         className="absolute left-0 top-full mt-2 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-50"
                       >
+                        {/* Status */}
+                        <button
+                          onClick={() => {
+                            setIsProfileMenuOpen(false);
+                            setIsStatusModalOpen(true);
+                          }}
+                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-lg">
+                            {userSettings.statusEmoji}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-medium">Status</p>
+                            <p className="text-zinc-500 text-xs truncate">
+                              {userSettings.statusText || 'Set your status'}
+                            </p>
+                          </div>
+                          {userSettings.isDnd && (
+                            <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">DND</span>
+                          )}
+                        </button>
+
                         {/* Username */}
                         <button
                           onClick={() => {
                             setIsProfileMenuOpen(false);
                             setIsUsernameModalOpen(true);
                           }}
-                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left"
+                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
                         >
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${shoutUsername ? 'bg-violet-500/20' : 'bg-zinc-800'}`}>
                             <svg className={`w-4 h-4 ${shoutUsername ? 'text-violet-400' : 'text-zinc-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -525,34 +603,12 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={refreshFriends}
-                  disabled={isFriendsLoading}
-                  className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-50"
-                  title="Refresh"
-                >
-                  <svg
-                    className={`w-5 h-5 ${isFriendsLoading ? "animate-spin" : ""}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={onLogout}
-                  className="py-2 px-4 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors"
-                >
-                  Disconnect
-                </button>
-              </div>
+              <button
+                onClick={onLogout}
+                className="py-2 px-4 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors"
+              >
+                Disconnect
+              </button>
             </div>
           </div>
         </header>
@@ -973,6 +1029,16 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
         onClose={() => setIsPhoneModalOpen(false)}
         userAddress={userAddress}
         onSuccess={() => {}}
+      />
+
+      {/* Status Modal */}
+      <StatusModal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        currentSettings={userSettings}
+        onSave={setStatus}
+        onToggleDnd={toggleDnd}
+        onToggleSound={toggleSound}
       />
 
       {/* Toast Notification for New Messages */}
