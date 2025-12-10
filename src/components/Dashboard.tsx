@@ -20,6 +20,7 @@ import { PhoneVerificationModal } from "./PhoneVerificationModal";
 import { XMTPProvider, useXMTPContext } from "@/context/XMTPProvider";
 import { useUsername } from "@/hooks/useUsername";
 import { usePhoneVerification } from "@/hooks/usePhoneVerification";
+import { useNotifications } from "@/hooks/useNotifications";
 import { isAgoraConfigured } from "@/config/agora";
 
 type DashboardProps = {
@@ -86,6 +87,18 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   
   // Phone verification hook
   const { phoneNumber: verifiedPhone, isVerified: isPhoneVerified } = usePhoneVerification(userAddress);
+  
+  // Notifications hook
+  const {
+    permission: notificationPermission,
+    requestPermission: requestNotificationPermission,
+    notifyMessage,
+    startRinging,
+    stopRinging,
+    notifyOutgoingCall,
+    notifyCallConnected,
+    notifyCallEnded,
+  } = useNotifications();
 
   const { resolveAddressOrENS } = useENS();
   
@@ -252,7 +265,30 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
       )
     : null;
 
-  // Listen for new messages and show toast
+  // Request notification permission on first interaction
+  useEffect(() => {
+    const handleInteraction = () => {
+      if (notificationPermission === "default") {
+        requestNotificationPermission();
+      }
+      // Remove listener after first interaction
+      document.removeEventListener("click", handleInteraction);
+    };
+    document.addEventListener("click", handleInteraction);
+    return () => document.removeEventListener("click", handleInteraction);
+  }, [notificationPermission, requestNotificationPermission]);
+
+  // Play ring sound for incoming calls
+  useEffect(() => {
+    if (incomingCall && callState === "idle") {
+      const callerName = incomingCallFriend?.ensName || incomingCallFriend?.nickname || "Someone";
+      startRinging(callerName);
+    } else {
+      stopRinging();
+    }
+  }, [incomingCall, callState, incomingCallFriend, startRinging, stopRinging]);
+
+  // Listen for new messages and show toast + notification
   useEffect(() => {
     if (!isXMTPInitialized) return;
     
@@ -263,7 +299,10 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
       );
       const senderName = friend?.ensName || friend?.nickname || formatAddress(senderAddress);
       
-      // Show toast notification
+      // Play sound and show browser notification
+      notifyMessage(senderName, content);
+      
+      // Show toast notification in-app
       setToast({
         sender: senderName,
         message: content.length > 50 ? content.slice(0, 50) + "..." : content,
@@ -274,7 +313,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     });
     
     return unsubscribe;
-  }, [isXMTPInitialized, onNewMessage, friendsListData]);
+  }, [isXMTPInitialized, onNewMessage, friendsListData, notifyMessage]);
 
   const handleSendFriendRequest = async (addressOrENS: string): Promise<boolean> => {
     return await sendFriendRequest(addressOrENS);
@@ -287,6 +326,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     }
 
     setCurrentCallFriend(friend);
+    notifyOutgoingCall(); // Play outgoing call sound
     
     // Generate a unique channel name based on both addresses (sorted for consistency)
     const addresses = [userAddress.toLowerCase(), friend.address.toLowerCase()].sort();
@@ -296,7 +336,10 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     await startCall(friend.address, channelName);
     
     // Join the Agora channel (with or without video)
-    await joinCall(channelName, undefined, withVideo);
+    const success = await joinCall(channelName, undefined, withVideo);
+    if (success) {
+      notifyCallConnected();
+    }
   };
 
   const handleVideoCall = async (friend: FriendsListFriend) => {
@@ -304,6 +347,7 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   };
 
   const handleAcceptCall = async () => {
+    stopRinging(); // Stop the ring sound
     const channelName = await acceptCall();
     if (channelName) {
       // Find the caller friend to show in the call UI
@@ -311,11 +355,15 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
         setCurrentCallFriend(incomingCallFriend);
       }
       // Join the Agora channel
-      await joinCall(channelName);
+      const success = await joinCall(channelName);
+      if (success) {
+        notifyCallConnected();
+      }
     }
   };
 
   const handleRejectCall = async () => {
+    stopRinging();
     await rejectCall();
   };
 
@@ -323,13 +371,15 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   useEffect(() => {
     if (remoteHangup) {
       console.log("[Dashboard] Remote party hung up - leaving call");
+      notifyCallEnded();
       leaveCall();
       setCurrentCallFriend(null);
       clearRemoteHangup();
     }
-  }, [remoteHangup, leaveCall, clearRemoteHangup]);
+  }, [remoteHangup, leaveCall, clearRemoteHangup, notifyCallEnded]);
 
   const handleEndCall = async () => {
+    notifyCallEnded();
     await leaveCall();
     await endCallSignaling();
     setCurrentCallFriend(null);
