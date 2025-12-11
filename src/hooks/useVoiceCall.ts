@@ -51,6 +51,8 @@ export function useVoiceCall() {
     const remoteVideoTrackRef = useRef<any>(null);
     const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const startTimeRef = useRef<number | null>(null);
+    const isJoiningRef = useRef<boolean>(false);
+    const shouldAbortRef = useRef<boolean>(false);
 
     // Refs for video elements
     const localVideoRef = useRef<HTMLDivElement | null>(null);
@@ -120,6 +122,10 @@ export function useVoiceCall() {
                 }));
                 return false;
             }
+
+            // Reset abort flag and set joining flag
+            shouldAbortRef.current = false;
+            isJoiningRef.current = true;
 
             setState((prev) => ({
                 ...prev,
@@ -285,15 +291,37 @@ export function useVoiceCall() {
                     }
                 }
 
+                isJoiningRef.current = false;
                 setState((prev) => ({ ...prev, callState: "connected" }));
                 startDurationTimer();
 
                 return true;
             } catch (error) {
+                isJoiningRef.current = false;
+                
                 let message =
                     error instanceof Error
                         ? error.message
                         : "Failed to join call";
+
+                // Handle abort/cancel errors gracefully (user cancelled before connected)
+                if (message.includes("WS_ABORT") || message.includes("LEAVE") || shouldAbortRef.current) {
+                    console.log("[Call] Join was cancelled by user");
+                    // Reset to idle state without showing error
+                    setState({
+                        callState: "idle",
+                        callType: "audio",
+                        isMuted: false,
+                        isVideoOff: true,
+                        isScreenSharing: false,
+                        isRemoteMuted: false,
+                        isRemoteVideoOff: true,
+                        isRemoteScreenSharing: false,
+                        error: null,
+                        duration: 0,
+                    });
+                    return false;
+                }
 
                 // Handle specific Agora errors
                 if (message.includes("dynamic use static key")) {
@@ -313,6 +341,12 @@ export function useVoiceCall() {
     );
 
     const leaveCall = useCallback(async () => {
+        // Signal abort if join is in progress
+        if (isJoiningRef.current) {
+            console.log("[Call] Aborting join in progress");
+            shouldAbortRef.current = true;
+        }
+
         setState((prev) => ({ ...prev, callState: "leaving" }));
         stopDurationTimer();
 
@@ -340,12 +374,18 @@ export function useVoiceCall() {
 
             // Leave channel and destroy client
             if (clientRef.current) {
-                await clientRef.current.leave();
+                try {
+                    await clientRef.current.leave();
+                } catch (leaveError) {
+                    // Ignore errors when leaving (might already be disconnected)
+                    console.log("[Call] Leave error (may be expected):", leaveError);
+                }
                 clientRef.current = null;
             }
 
             remoteAudioTrackRef.current = null;
             remoteVideoTrackRef.current = null;
+            isJoiningRef.current = false;
 
             setState({
                 callState: "idle",
@@ -361,6 +401,7 @@ export function useVoiceCall() {
             });
         } catch (error) {
             console.error("Error leaving call:", error);
+            isJoiningRef.current = false;
             setState((prev) => ({
                 ...prev,
                 callState: "idle",
