@@ -75,6 +75,7 @@ export function GroupChatModal({
     markGroupAsRead,
     addGroupMembers,
     removeGroupMember,
+    leaveGroup,
   } = useXMTPContext();
 
   // Scroll to bottom when messages change
@@ -249,18 +250,21 @@ export function GroupChatModal({
     }
   };
 
-  // Handle leaving/deleting the group
+  // Handle leaving the group
   const handleLeaveGroup = async () => {
     if (!group) return;
     
-    const confirmed = window.confirm("Are you sure you want to leave this group?");
+    const confirmed = window.confirm("Are you sure you want to leave this group? You won't be able to see messages anymore.");
     if (!confirmed) return;
     
     setIsLeavingGroup(true);
     setError(null);
     
     try {
-      const result = await removeGroupMember(group.id, userAddress);
+      console.log("[GroupChat] Attempting to leave group:", group.id);
+      const result = await leaveGroup(group.id);
+      console.log("[GroupChat] Leave result:", result);
+      
       if (result.success) {
         onGroupDeleted?.();
         onClose();
@@ -268,7 +272,8 @@ export function GroupChatModal({
         setError(result.error || "Failed to leave group");
       }
     } catch (err) {
-      setError("Failed to leave group");
+      console.error("[GroupChat] Leave error:", err);
+      setError(err instanceof Error ? err.message : "Failed to leave group");
     } finally {
       setIsLeavingGroup(false);
     }

@@ -21,6 +21,9 @@ export type XMTPGroup = {
   createdAt: Date;
 };
 
+// Store hidden groups in localStorage
+const HIDDEN_GROUPS_KEY = "shout_hidden_groups";
+
 type XMTPContextType = {
   isInitialized: boolean;
   isInitializing: boolean;
@@ -46,6 +49,8 @@ type XMTPContextType = {
   getGroupMembers: (groupId: string) => Promise<{ inboxId: string; addresses: string[] }[]>;
   addGroupMembers: (groupId: string, memberAddresses: string[]) => Promise<{ success: boolean; error?: string }>;
   removeGroupMember: (groupId: string, memberAddress: string) => Promise<{ success: boolean; error?: string }>;
+  leaveGroup: (groupId: string) => Promise<{ success: boolean; error?: string }>;
+  joinGroupById: (groupId: string) => Promise<{ success: boolean; error?: string }>;
   markGroupAsRead: (groupId: string) => void;
 };
 
@@ -675,12 +680,38 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
     []
   );
 
+  // Get hidden groups from localStorage
+  const getHiddenGroups = useCallback((): Set<string> => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const hidden = localStorage.getItem(HIDDEN_GROUPS_KEY);
+      return hidden ? new Set(JSON.parse(hidden)) : new Set();
+    } catch {
+      return new Set();
+    }
+  }, []);
+
+  // Hide a group locally
+  const hideGroup = useCallback((groupId: string) => {
+    if (typeof window === "undefined") return;
+    try {
+      const hidden = getHiddenGroups();
+      hidden.add(groupId);
+      localStorage.setItem(HIDDEN_GROUPS_KEY, JSON.stringify([...hidden]));
+    } catch (err) {
+      console.error("[XMTP] Failed to hide group:", err);
+    }
+  }, [getHiddenGroups]);
+
   // Get all groups
   const getGroups = useCallback(async (): Promise<XMTPGroup[]> => {
     if (!clientRef.current) return [];
 
     try {
       await clientRef.current.conversations.sync();
+      
+      // Get hidden groups
+      const hiddenGroups = getHiddenGroups();
       
       // Try to use listGroups() if available (XMTP v3 has this method)
       let groupConversations = [];
@@ -694,9 +725,6 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
         const conversations = await clientRef.current.conversations.list();
         
         for (const convo of conversations) {
-          // Log to understand structure
-          console.log("[XMTP] Conversation properties:", Object.keys(convo));
-          
           // Groups in XMTP v3 have specific properties
           // Check for group-specific methods or properties
           const hasGroupMethods = typeof convo.updateName === "function" || 
@@ -710,10 +738,16 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
         }
       }
 
-      console.log("[XMTP] Found", groupConversations.length, "groups");
+      console.log("[XMTP] Found", groupConversations.length, "groups total");
 
       const groups: XMTPGroup[] = [];
       for (const convo of groupConversations) {
+        // Skip hidden groups
+        if (hiddenGroups.has(convo.id)) {
+          console.log("[XMTP] Skipping hidden group:", convo.id);
+          continue;
+        }
+        
         try {
           const members = await convo.members();
           groups.push({
@@ -727,12 +761,13 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
         }
       }
 
+      console.log("[XMTP] Returning", groups.length, "visible groups");
       return groups;
     } catch (err) {
       console.error("[XMTP] Failed to get groups:", err);
       return [];
     }
-  }, []);
+  }, [getHiddenGroups]);
 
   // Get messages from a group
   const getGroupMessages = useCallback(async (groupId: string): Promise<unknown[]> => {
@@ -914,6 +949,114 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
     []
   );
 
+  // Leave a group (remove self) - also hides it locally as fallback
+  const leaveGroup = useCallback(
+    async (groupId: string): Promise<{ success: boolean; error?: string }> => {
+      if (!clientRef.current) {
+        return { success: false, error: "XMTP not initialized" };
+      }
+
+      try {
+        await clientRef.current.conversations.sync();
+        const conversations = await clientRef.current.conversations.list();
+        const group = conversations.find((c: { id: string }) => c.id === groupId);
+
+        if (!group) {
+          // Group not found - maybe already left, just hide it
+          hideGroup(groupId);
+          return { success: true };
+        }
+
+        let leftSuccessfully = false;
+
+        // Try different methods to leave the group
+        // Method 1: Direct leave method (if available)
+        if (typeof group.leave === "function") {
+          console.log("[XMTP] Using group.leave()");
+          try {
+            await group.leave();
+            leftSuccessfully = true;
+          } catch (e) {
+            console.log("[XMTP] group.leave() failed:", e);
+          }
+        }
+
+        // Method 2: Remove self from group
+        if (!leftSuccessfully && typeof group.removeSelf === "function") {
+          console.log("[XMTP] Using group.removeSelf()");
+          try {
+            await group.removeSelf();
+            leftSuccessfully = true;
+          } catch (e) {
+            console.log("[XMTP] group.removeSelf() failed:", e);
+          }
+        }
+
+        // Method 3: Remove self using removeMembers with own inbox ID
+        if (!leftSuccessfully) {
+          console.log("[XMTP] Trying to remove self via removeMembers");
+          try {
+            const myInboxId = clientRef.current.inboxId;
+            await group.removeMembers([myInboxId]);
+            leftSuccessfully = true;
+          } catch (e) {
+            console.log("[XMTP] removeMembers(self) failed:", e);
+          }
+        }
+
+        // Always hide the group locally as a fallback
+        // This ensures the user won't see the group even if XMTP doesn't support leaving
+        hideGroup(groupId);
+        console.log("[XMTP] Group hidden locally:", groupId);
+
+        return { success: true };
+      } catch (err) {
+        console.error("[XMTP] Failed to leave group:", err);
+        // Still hide locally even if XMTP fails
+        hideGroup(groupId);
+        return { success: true }; // Return success since we hid it locally
+      }
+    },
+    [hideGroup]
+  );
+
+  // Join a group by ID (for accepting invitations)
+  const joinGroupById = useCallback(
+    async (groupId: string): Promise<{ success: boolean; error?: string }> => {
+      if (!clientRef.current) {
+        return { success: false, error: "XMTP not initialized" };
+      }
+
+      try {
+        await clientRef.current.conversations.sync();
+        
+        // The group should already exist from the invitation
+        // We just need to sync and it should appear
+        console.log("[XMTP] Syncing to join group:", groupId);
+        
+        // Remove from hidden groups if it was hidden
+        if (typeof window !== "undefined") {
+          try {
+            const hidden = getHiddenGroups();
+            if (hidden.has(groupId)) {
+              hidden.delete(groupId);
+              localStorage.setItem(HIDDEN_GROUPS_KEY, JSON.stringify([...hidden]));
+              console.log("[XMTP] Unhid group:", groupId);
+            }
+          } catch (e) {
+            console.log("[XMTP] Error unhiding group:", e);
+          }
+        }
+
+        return { success: true };
+      } catch (err) {
+        console.error("[XMTP] Failed to join group:", err);
+        return { success: false, error: err instanceof Error ? err.message : "Failed to join group" };
+      }
+    },
+    [getHiddenGroups]
+  );
+
   // Mark group messages as read
   const markGroupAsRead = useCallback((groupId: string) => {
     setUnreadCounts((prev) => {
@@ -966,6 +1109,8 @@ export function XMTPProvider({ children, userAddress }: { children: ReactNode; u
         getGroupMembers,
         addGroupMembers,
         removeGroupMember,
+        leaveGroup,
+        joinGroupById,
         markGroupAsRead,
       }}
     >

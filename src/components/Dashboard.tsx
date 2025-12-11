@@ -35,6 +35,8 @@ import { GroupCallUI } from "./GroupCallUI";
 import { IncomingGroupCallModal } from "./IncomingGroupCallModal";
 import { type XMTPGroup } from "@/context/XMTPProvider";
 import { useGroupCallSignaling } from "@/hooks/useGroupCallSignaling";
+import { useGroupInvitations } from "@/hooks/useGroupInvitations";
+import { GroupInvitations } from "./GroupInvitations";
 
 type DashboardProps = {
   userAddress: Address;
@@ -93,6 +95,14 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     leaveGroupCall,
     dismissIncomingCall,
   } = useGroupCallSignaling(userAddress);
+
+  // Group invitations
+  const {
+    pendingInvitations,
+    sendInvitations,
+    acceptInvitation,
+    declineInvitation,
+  } = useGroupInvitations(userAddress);
   
   
   // iOS Chrome detection (Chrome on iOS doesn't support WebRTC properly)
@@ -237,6 +247,8 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
     createGroup,
     getGroups,
     markGroupAsRead,
+    joinGroupById,
+    addGroupMembers,
   } = useXMTPContext();
   
   // Toast notification state
@@ -349,21 +361,44 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
   const handleCreateGroup = async (memberAddresses: string[], groupName: string): Promise<boolean> => {
     setIsCreatingGroup(true);
     try {
-      const result = await createGroup(memberAddresses, groupName);
-      if (result.success) {
-        // Refresh groups list
-        const fetchedGroups = await getGroups();
-        setGroups(fetchedGroups);
-        return true;
-      } else {
+      // Create the group with just the creator first
+      const result = await createGroup([], groupName);
+      if (!result.success || !result.groupId) {
         console.error("[Dashboard] Failed to create group:", result.error);
         return false;
       }
+
+      // Send invitations to all selected members
+      const invitesSent = await sendInvitations(result.groupId, groupName, memberAddresses);
+      if (!invitesSent) {
+        console.warn("[Dashboard] Failed to send some invitations");
+      }
+
+      // Refresh groups list
+      const fetchedGroups = await getGroups();
+      setGroups(fetchedGroups);
+      
+      return true;
     } catch (err) {
       console.error("[Dashboard] Create group error:", err);
       return false;
     } finally {
       setIsCreatingGroup(false);
+    }
+  };
+
+  // Handler to join a group after accepting an invitation
+  const handleJoinGroupFromInvite = async (groupId: string) => {
+    try {
+      // Join the XMTP group
+      const result = await joinGroupById(groupId);
+      if (result.success) {
+        // Refresh groups list
+        const fetchedGroups = await getGroups();
+        setGroups(fetchedGroups);
+      }
+    } catch (err) {
+      console.error("[Dashboard] Failed to join group:", err);
     }
   };
 
@@ -1258,6 +1293,18 @@ function DashboardContent({ userAddress, onLogout, isPasskeyUser }: DashboardPro
               />
             </div>
           </div>
+
+          {/* Group Invitations Section */}
+          {isXMTPInitialized && !isPasskeyUser && pendingInvitations.length > 0 && (
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6 p-6">
+              <GroupInvitations
+                invitations={pendingInvitations}
+                onAccept={acceptInvitation}
+                onDecline={declineInvitation}
+                onJoinGroup={handleJoinGroupFromInvite}
+              />
+            </div>
+          )}
 
           {/* Groups Section - Only show if XMTP is enabled */}
           {isXMTPInitialized && !isPasskeyUser && (
