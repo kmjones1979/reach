@@ -265,6 +265,7 @@ function DashboardContent({
         toggleMute,
         toggleVideo,
         toggleScreenShare,
+        takeScreenshot,
         formatDuration,
         setLocalVideoContainer,
         setRemoteVideoContainer,
@@ -2125,6 +2126,7 @@ function DashboardContent({
                         onToggleMute={toggleMute}
                         onToggleVideo={toggleVideo}
                         onToggleScreenShare={toggleScreenShare}
+                        onTakeScreenshot={takeScreenshot}
                         onEndCall={handleEndCall}
                         setLocalVideoContainer={setLocalVideoContainer}
                         setRemoteVideoContainer={setRemoteVideoContainer}

@@ -298,14 +298,18 @@ export function useVoiceCall() {
                 return true;
             } catch (error) {
                 isJoiningRef.current = false;
-                
+
                 let message =
                     error instanceof Error
                         ? error.message
                         : "Failed to join call";
 
                 // Handle abort/cancel errors gracefully (user cancelled before connected)
-                if (message.includes("WS_ABORT") || message.includes("LEAVE") || shouldAbortRef.current) {
+                if (
+                    message.includes("WS_ABORT") ||
+                    message.includes("LEAVE") ||
+                    shouldAbortRef.current
+                ) {
                     console.log("[Call] Join was cancelled by user");
                     // Reset to idle state without showing error
                     setState({
@@ -378,7 +382,10 @@ export function useVoiceCall() {
                     await clientRef.current.leave();
                 } catch (leaveError) {
                     // Ignore errors when leaving (might already be disconnected)
-                    console.log("[Call] Leave error (may be expected):", leaveError);
+                    console.log(
+                        "[Call] Leave error (may be expected):",
+                        leaveError
+                    );
                 }
                 clientRef.current = null;
             }
@@ -430,14 +437,19 @@ export function useVoiceCall() {
         }
 
         const currentlyVideoOff = isVideoOffRef.current;
-        console.log("[Video] Toggle video called, currently off:", currentlyVideoOff);
+        console.log(
+            "[Video] Toggle video called, currently off:",
+            currentlyVideoOff
+        );
 
         if (!currentlyVideoOff) {
             // Turn off video (currently on -> turn off)
             console.log("[Video] Turning OFF video");
             if (localVideoTrackRef.current) {
                 try {
-                    await clientRef.current.unpublish([localVideoTrackRef.current]);
+                    await clientRef.current.unpublish([
+                        localVideoTrackRef.current,
+                    ]);
                     localVideoTrackRef.current.stop();
                     localVideoTrackRef.current.close();
                     localVideoTrackRef.current = null;
@@ -454,8 +466,12 @@ export function useVoiceCall() {
                 // Agora only allows ONE video track at a time
                 // If screen sharing is on, we need to stop it first
                 if (localScreenTrackRef.current) {
-                    console.log("[Video] Stopping screen share to enable camera");
-                    await clientRef.current.unpublish([localScreenTrackRef.current]);
+                    console.log(
+                        "[Video] Stopping screen share to enable camera"
+                    );
+                    await clientRef.current.unpublish([
+                        localScreenTrackRef.current,
+                    ]);
                     localScreenTrackRef.current.stop();
                     localScreenTrackRef.current.close();
                     localScreenTrackRef.current = null;
@@ -498,7 +514,9 @@ export function useVoiceCall() {
         if (state.isScreenSharing) {
             // Stop screen sharing
             if (localScreenTrackRef.current) {
-                await clientRef.current.unpublish([localScreenTrackRef.current]);
+                await clientRef.current.unpublish([
+                    localScreenTrackRef.current,
+                ]);
                 localScreenTrackRef.current.stop();
                 localScreenTrackRef.current.close();
                 localScreenTrackRef.current = null;
@@ -511,8 +529,12 @@ export function useVoiceCall() {
                 // If camera is on, we need to stop it first
                 const wasVideoOn = !state.isVideoOff;
                 if (localVideoTrackRef.current) {
-                    console.log("[Screen] Stopping camera to enable screen share");
-                    await clientRef.current.unpublish([localVideoTrackRef.current]);
+                    console.log(
+                        "[Screen] Stopping camera to enable screen share"
+                    );
+                    await clientRef.current.unpublish([
+                        localVideoTrackRef.current,
+                    ]);
                     localVideoTrackRef.current.stop();
                     localVideoTrackRef.current.close();
                     localVideoTrackRef.current = null;
@@ -528,19 +550,29 @@ export function useVoiceCall() {
                 );
 
                 // Handle if array is returned (when audio is enabled)
-                const videoTrack = Array.isArray(screenTrack) ? screenTrack[0] : screenTrack;
+                const videoTrack = Array.isArray(screenTrack)
+                    ? screenTrack[0]
+                    : screenTrack;
                 localScreenTrackRef.current = videoTrack;
 
                 // Listen for when user stops sharing via browser UI
                 videoTrack.on("track-ended", async () => {
-                    console.log("[Screen] User stopped screen share via browser");
+                    console.log(
+                        "[Screen] User stopped screen share via browser"
+                    );
                     if (clientRef.current && localScreenTrackRef.current) {
-                        await clientRef.current.unpublish([localScreenTrackRef.current]).catch(console.error);
+                        await clientRef.current
+                            .unpublish([localScreenTrackRef.current])
+                            .catch(console.error);
                         localScreenTrackRef.current.stop();
                         localScreenTrackRef.current.close();
                         localScreenTrackRef.current = null;
                     }
-                    setState((prev) => ({ ...prev, isScreenSharing: false, isVideoOff: true }));
+                    setState((prev) => ({
+                        ...prev,
+                        isScreenSharing: false,
+                        isVideoOff: true,
+                    }));
                 });
 
                 await clientRef.current.publish([videoTrack]);
@@ -556,7 +588,9 @@ export function useVoiceCall() {
                 // Play screen share in the screen share container
                 const playScreen = () => {
                     if (screenShareRef.current && localScreenTrackRef.current) {
-                        localScreenTrackRef.current.play(screenShareRef.current);
+                        localScreenTrackRef.current.play(
+                            screenShareRef.current
+                        );
                     } else if (localScreenTrackRef.current) {
                         setTimeout(playScreen, 100);
                     }
@@ -633,6 +667,107 @@ export function useVoiceCall() {
         []
     );
 
+    // Screenshot functionality - captures video call to image
+    const takeScreenshot = useCallback(async (): Promise<boolean> => {
+        try {
+            // Find video elements in the containers
+            const remoteVideo = remoteVideoRef.current?.querySelector("video");
+            const localVideo = localVideoRef.current?.querySelector("video");
+
+            if (!remoteVideo && !localVideo) {
+                console.log("[Screenshot] No video elements found");
+                return false;
+            }
+
+            // Determine canvas size - use remote video dimensions or fallback
+            const width = remoteVideo?.videoWidth || localVideo?.videoWidth || 1280;
+            const height = remoteVideo?.videoHeight || localVideo?.videoHeight || 720;
+
+            // Create canvas
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return false;
+
+            // Fill with dark background
+            ctx.fillStyle = "#18181b";
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw remote video (main view)
+            if (remoteVideo && remoteVideo.readyState >= 2) {
+                ctx.drawImage(remoteVideo, 0, 0, width, height);
+            }
+
+            // Draw local video (picture-in-picture) in bottom-right
+            if (localVideo && localVideo.readyState >= 2) {
+                const pipWidth = Math.floor(width * 0.25);
+                const pipHeight = Math.floor(height * 0.25);
+                const pipX = width - pipWidth - 20;
+                const pipY = 20;
+
+                // Draw border
+                ctx.fillStyle = "#3f3f46";
+                ctx.fillRect(pipX - 2, pipY - 2, pipWidth + 4, pipHeight + 4);
+
+                // Draw local video
+                ctx.drawImage(localVideo, pipX, pipY, pipWidth, pipHeight);
+            }
+
+            // Add timestamp watermark
+            const timestamp = new Date().toLocaleString();
+            ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+            ctx.font = "16px sans-serif";
+            ctx.fillText(timestamp, 20, height - 20);
+
+            // Convert to blob
+            const blob = await new Promise<Blob | null>((resolve) => {
+                canvas.toBlob(resolve, "image/png", 1.0);
+            });
+
+            if (!blob) {
+                console.error("[Screenshot] Failed to create blob");
+                return false;
+            }
+
+            // Try Web Share API first (best for mobile)
+            if (navigator.share && navigator.canShare) {
+                const file = new File([blob], `reach-call-${Date.now()}.png`, {
+                    type: "image/png",
+                });
+                const shareData = { files: [file] };
+
+                if (navigator.canShare(shareData)) {
+                    try {
+                        await navigator.share(shareData);
+                        console.log("[Screenshot] Shared via Web Share API");
+                        return true;
+                    } catch (e) {
+                        // User cancelled or share failed, fall through to download
+                        if ((e as Error).name !== "AbortError") {
+                            console.log("[Screenshot] Share failed, falling back to download");
+                        }
+                    }
+                }
+            }
+
+            // Fallback: Download the image
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `reach-call-${Date.now()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            console.log("[Screenshot] Downloaded image");
+            return true;
+        } catch (error) {
+            console.error("[Screenshot] Error:", error);
+            return false;
+        }
+    }, []);
+
     return {
         ...state,
         joinCall,
@@ -640,6 +775,7 @@ export function useVoiceCall() {
         toggleMute,
         toggleVideo,
         toggleScreenShare,
+        takeScreenshot,
         formatDuration,
         setLocalVideoContainer,
         setRemoteVideoContainer,
