@@ -11,28 +11,22 @@ import React, {
 import {
     createWebAuthnCredential,
     toWebAuthnAccount,
-    entryPoint07Address,
     type WebAuthnAccount,
     type P256Credential,
     type SmartAccount,
 } from "viem/account-abstraction";
-import { createPublicClient, http, type Address } from "viem";
-import { baseSepolia } from "viem/chains";
-import { createPimlicoClient } from "permissionless/clients/pimlico";
-import {
-    toSafeSmartAccount,
-    type SafeSmartAccountImplementation,
-} from "permissionless/accounts";
-import { createSmartAccountClient } from "permissionless";
+import { type Address } from "viem";
+import { type SafeSmartAccountImplementation } from "permissionless/accounts";
 
 // Storage keys
 const CREDENTIAL_STORAGE_KEY = "reach_passkey_credential";
 const DEVICE_ID_STORAGE_KEY = "reach_device_id";
+const DEVICE_ADDRESS_STORAGE_KEY = "reach_passkey_address";
 
 // Get or create a unique device ID
 function getDeviceId(): string {
     if (typeof window === "undefined") return "";
-    
+
     let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
     if (!deviceId) {
         // Generate a random device ID
@@ -43,12 +37,18 @@ function getDeviceId(): string {
 }
 
 // Hash function to combine credential public key with device ID
-async function hashWithDeviceEntropy(publicKey: string, deviceId: string): Promise<string> {
+async function hashWithDeviceEntropy(
+    publicKey: string,
+    deviceId: string
+): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(publicKey + deviceId);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data.buffer as ArrayBuffer);
+    const hashBuffer = await crypto.subtle.digest(
+        "SHA-256",
+        data.buffer as ArrayBuffer
+    );
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // Types
@@ -71,11 +71,6 @@ export type PasskeyContextType = PasskeyState & {
 };
 
 const PasskeyContext = createContext<PasskeyContextType | null>(null);
-
-// Get the chain and bundler URL from environment
-const chain = baseSepolia;
-const bundlerUrl = process.env.NEXT_PUBLIC_PIMLICO_BUNDLER_URL;
-const pimlicoApiKey = process.env.NEXT_PUBLIC_PIMLICO_API_KEY;
 
 export function PasskeyProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<PasskeyState>({
@@ -101,74 +96,40 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
 
     const createSmartAccountFromCredential = useCallback(
         async (credential: P256Credential) => {
-            if (!bundlerUrl && !pimlicoApiKey) {
-                console.warn("Pimlico not configured - using device-specific derived address");
-                // Generate a device-specific address by hashing credential + device ID
+            // Always use device-specific address to ensure unique accounts per device
+            // Check if we already have a stored address for this device
+            let deviceAddress = localStorage.getItem(DEVICE_ADDRESS_STORAGE_KEY);
+            
+            if (!deviceAddress) {
+                // Generate a new device-specific address
                 const deviceId = getDeviceId();
-                const deviceHash = await hashWithDeviceEntropy(credential.publicKey, deviceId);
+                const deviceHash = await hashWithDeviceEntropy(
+                    credential.publicKey,
+                    deviceId
+                );
                 // Use first 40 chars of hash as address (20 bytes)
-                const mockAddress = `0x${deviceHash.slice(0, 40)}` as Address;
-                console.log("[Passkey] Device ID:", deviceId.slice(0, 8) + "...");
-                console.log("[Passkey] Derived address:", mockAddress);
-                return {
-                    webAuthnAccount: toWebAuthnAccount({ credential }),
-                    smartAccount: null,
-                    smartAccountAddress: mockAddress,
-                };
+                deviceAddress = `0x${deviceHash.slice(0, 40)}`;
+                // Store it for future use
+                localStorage.setItem(DEVICE_ADDRESS_STORAGE_KEY, deviceAddress);
+                console.log(
+                    "[Passkey] Generated new device-specific address:",
+                    deviceAddress
+                );
+                console.log(
+                    "[Passkey] Device ID:",
+                    deviceId.slice(0, 8) + "..."
+                );
+            } else {
+                console.log(
+                    "[Passkey] Using stored device address:",
+                    deviceAddress
+                );
             }
 
-            const actualBundlerUrl =
-                bundlerUrl ||
-                `https://api.pimlico.io/v2/${chain.id}/rpc?apikey=${pimlicoApiKey}`;
-
-            const publicClient = createPublicClient({
-                chain,
-                transport: http(),
-            });
-
-            const pimlicoClient = createPimlicoClient({
-                transport: http(actualBundlerUrl),
-                entryPoint: {
-                    address: entryPoint07Address,
-                    version: "0.7",
-                },
-            });
-
-            const webAuthnAccount = toWebAuthnAccount({ credential });
-
-            const safeAccount = await toSafeSmartAccount({
-                client: publicClient,
-                owners: [webAuthnAccount],
-                version: "1.4.1",
-                entryPoint: {
-                    address: entryPoint07Address,
-                    version: "0.7",
-                },
-                safe4337ModuleAddress:
-                    "0x7579EE8307284F293B1927136486880611F20002",
-                erc7579LaunchpadAddress:
-                    "0x7579011aB74c46090561ea277Ba79D510c6C00ff",
-                attesters: ["0x000000333034E9f539ce08819E12c1b8Cb29084d"],
-                attestersThreshold: 1,
-            });
-
-            const smartAccountClient = createSmartAccountClient({
-                account: safeAccount,
-                chain,
-                bundlerTransport: http(actualBundlerUrl),
-                paymaster: pimlicoClient,
-                userOperation: {
-                    estimateFeesPerGas: async () => {
-                        return (await pimlicoClient.getUserOperationGasPrice())
-                            .fast;
-                    },
-                },
-            });
-
             return {
-                webAuthnAccount,
-                smartAccount: smartAccountClient.account,
-                smartAccountAddress: safeAccount.address,
+                webAuthnAccount: toWebAuthnAccount({ credential }),
+                smartAccount: null,
+                smartAccountAddress: deviceAddress as Address,
             };
         },
         []
@@ -346,5 +307,3 @@ export function usePasskeyContext() {
     }
     return context;
 }
-
-
