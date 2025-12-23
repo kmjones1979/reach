@@ -289,6 +289,23 @@ export function useHuddle01Call(userAddress: string | null) {
 
                 console.log("[Huddle01] Token received, creating client...");
 
+                // Pre-request permissions for iOS Safari
+                // This helps iOS properly prompt for permissions before the SDK tries to use them
+                try {
+                    console.log("[Huddle01] Pre-requesting media permissions...");
+                    const mediaConstraints: MediaStreamConstraints = {
+                        audio: true,
+                        video: withVideo,
+                    };
+                    const preStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+                    // Stop the tracks immediately - we just needed to prompt for permission
+                    preStream.getTracks().forEach((track) => track.stop());
+                    console.log("[Huddle01] Media permissions granted");
+                } catch (permError) {
+                    console.warn("[Huddle01] Could not get media permissions:", permError);
+                    // Don't fail - the SDK might still work or give a better error
+                }
+
                 // Create Huddle01 client (HuddleClient is guaranteed to be loaded at this point)
                 if (!HuddleClient) {
                     throw new Error("Huddle01 SDK not available");
@@ -611,18 +628,27 @@ export function useHuddle01Call(userAddress: string | null) {
                             track
                         ) {
                             // Check if we already have a local video element
-                            const existingVideo = localVideoRef.current.querySelector("video");
+                            const existingVideo =
+                                localVideoRef.current.querySelector("video");
                             if (existingVideo) {
                                 // Update existing element's stream instead of creating new one
                                 const stream = new MediaStream([track]);
                                 existingVideo.srcObject = stream;
-                                console.log("[Huddle01] Updated existing local video element");
+                                // iOS requires explicit play() call
+                                existingVideo.play().catch((e) => {
+                                    console.warn("[Huddle01] Local video play failed:", e);
+                                });
+                                console.log(
+                                    "[Huddle01] Updated existing local video element"
+                                );
                             } else {
                                 const stream = new MediaStream([track]);
                                 const videoEl = document.createElement("video");
                                 videoEl.srcObject = stream;
                                 videoEl.autoplay = true;
                                 videoEl.playsInline = true;
+                                // iOS-specific attributes
+                                videoEl.setAttribute("webkit-playsinline", "true");
                                 videoEl.muted = true;
                                 videoEl.style.width = "100%";
                                 videoEl.style.height = "100%";
@@ -631,7 +657,13 @@ export function useHuddle01Call(userAddress: string | null) {
                                 videoEl.style.transform = "scaleX(-1)";
                                 localVideoRef.current.innerHTML = "";
                                 localVideoRef.current.appendChild(videoEl);
-                                console.log("[Huddle01] Local video element created");
+                                // iOS requires explicit play() call
+                                videoEl.play().catch((e) => {
+                                    console.warn("[Huddle01] Local video play failed:", e);
+                                });
+                                console.log(
+                                    "[Huddle01] Local video element created"
+                                );
                             }
                         }
                     } catch (err) {
@@ -750,6 +782,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                         // Update existing audio element
                                         remoteAudioRef.current.srcObject =
                                             stream;
+                                        // iOS requires explicit play() call
+                                        remoteAudioRef.current.play().catch((e) => {
+                                            console.warn("[Huddle01] Audio play failed (iOS may need user gesture):", e);
+                                        });
                                         setState((prev) => ({
                                             ...prev,
                                             isRemoteMuted: false,
@@ -763,8 +799,15 @@ export function useHuddle01Call(userAddress: string | null) {
                                             document.createElement("audio");
                                         audioEl.srcObject = stream;
                                         audioEl.autoplay = true;
+                                        // iOS-specific attributes
+                                        audioEl.setAttribute("playsinline", "true");
+                                        audioEl.setAttribute("webkit-playsinline", "true");
                                         document.body.appendChild(audioEl);
                                         remoteAudioRef.current = audioEl;
+                                        // iOS requires explicit play() call
+                                        audioEl.play().catch((e) => {
+                                            console.warn("[Huddle01] Audio play failed (iOS may need user gesture):", e);
+                                        });
                                         setState((prev) => ({
                                             ...prev,
                                             isRemoteMuted: false,
@@ -784,6 +827,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                         if (existingVideo) {
                                             // Update existing video element with new track
                                             existingVideo.srcObject = stream;
+                                            // iOS requires explicit play() call
+                                            existingVideo.play().catch((e) => {
+                                                console.warn("[Huddle01] Video play failed:", e);
+                                            });
                                             setState((prev) => ({
                                                 ...prev,
                                                 isRemoteVideoOff: false,
@@ -799,6 +846,9 @@ export function useHuddle01Call(userAddress: string | null) {
                                             videoEl.srcObject = stream;
                                             videoEl.autoplay = true;
                                             videoEl.playsInline = true;
+                                            // iOS-specific attributes
+                                            videoEl.setAttribute("webkit-playsinline", "true");
+                                            videoEl.muted = false; // Ensure not muted for remote
                                             videoEl.style.width = "100%";
                                             videoEl.style.height = "100%";
                                             videoEl.style.objectFit = "cover";
@@ -806,6 +856,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                             remoteVideoRef.current.appendChild(
                                                 videoEl
                                             );
+                                            // iOS requires explicit play() call
+                                            videoEl.play().catch((e) => {
+                                                console.warn("[Huddle01] Video play failed:", e);
+                                            });
                                             setState((prev) => ({
                                                 ...prev,
                                                 isRemoteVideoOff: false,
@@ -1046,7 +1100,9 @@ export function useHuddle01Call(userAddress: string | null) {
                 // The room-joined event might not always fire, so ensure the timer is started here too
                 // If it was already started by room-joined, starting again is fine (it will just restart)
                 if (!startTimeRef.current) {
-                    console.log("[Huddle01] Starting duration timer (fallback)");
+                    console.log(
+                        "[Huddle01] Starting duration timer (fallback)"
+                    );
                     startDurationTimer();
                 }
 
@@ -1092,7 +1148,7 @@ export function useHuddle01Call(userAddress: string | null) {
                 const localPeer = clientRef.current.localPeer;
                 if (localPeer) {
                     console.log("[Huddle01] Stopping local media tracks...");
-                    
+
                     // Only disable audio if not already muted (producer exists)
                     if (!state.isMuted) {
                         try {
@@ -1102,7 +1158,7 @@ export function useHuddle01Call(userAddress: string | null) {
                             // Silently ignore - producer may not exist
                         }
                     }
-                    
+
                     // Only disable video if it was enabled (producer exists)
                     if (!state.isVideoOff) {
                         try {
@@ -1112,7 +1168,7 @@ export function useHuddle01Call(userAddress: string | null) {
                             // Silently ignore - producer may not exist
                         }
                     }
-                    
+
                     // Only stop screen share if it was active
                     if (state.isScreenSharing) {
                         try {
@@ -1169,7 +1225,10 @@ export function useHuddle01Call(userAddress: string | null) {
                     if (stream) {
                         stream.getTracks().forEach((track) => {
                             track.stop();
-                            console.log("[Huddle01] Stopped local video track:", track.kind);
+                            console.log(
+                                "[Huddle01] Stopped local video track:",
+                                track.kind
+                            );
                         });
                     }
                     video.srcObject = null;
@@ -1223,7 +1282,12 @@ export function useHuddle01Call(userAddress: string | null) {
                 roomId: null,
             });
         }
-    }, [stopDurationTimer, state.isMuted, state.isVideoOff, state.isScreenSharing]);
+    }, [
+        stopDurationTimer,
+        state.isMuted,
+        state.isVideoOff,
+        state.isScreenSharing,
+    ]);
 
     const toggleMute = useCallback(async () => {
         if (!clientRef.current) return;
@@ -1238,14 +1302,20 @@ export function useHuddle01Call(userAddress: string | null) {
                 try {
                     await localPeer.enableAudio();
                 } catch (enableErr) {
-                    console.warn("[Huddle01] Could not enable audio:", enableErr);
+                    console.warn(
+                        "[Huddle01] Could not enable audio:",
+                        enableErr
+                    );
                 }
                 setState((prev) => ({ ...prev, isMuted: false }));
             } else {
                 try {
                     await localPeer.disableAudio();
                 } catch (disableErr) {
-                    console.warn("[Huddle01] Could not disable audio (may not be enabled):", disableErr);
+                    console.warn(
+                        "[Huddle01] Could not disable audio (may not be enabled):",
+                        disableErr
+                    );
                 }
                 setState((prev) => ({ ...prev, isMuted: true }));
             }
@@ -1275,14 +1345,18 @@ export function useHuddle01Call(userAddress: string | null) {
                 try {
                     await localPeer.disableVideo();
                 } catch (disableErr) {
-                    console.warn("[Huddle01] Could not disable video (may not be enabled):", disableErr);
+                    console.warn(
+                        "[Huddle01] Could not disable video (may not be enabled):",
+                        disableErr
+                    );
                 }
                 // Always update state even if disable fails
                 setState((prev) => ({ ...prev, isVideoOff: true }));
-                
+
                 // Also clean up the local video element
                 if (localVideoRef.current) {
-                    const videos = localVideoRef.current.querySelectorAll("video");
+                    const videos =
+                        localVideoRef.current.querySelectorAll("video");
                     videos.forEach((video) => {
                         const stream = video.srcObject as MediaStream;
                         if (stream) {
@@ -1314,13 +1388,17 @@ export function useHuddle01Call(userAddress: string | null) {
                 try {
                     await localPeer.stopScreenShare();
                 } catch (stopErr) {
-                    console.warn("[Huddle01] Could not stop screen share:", stopErr);
+                    console.warn(
+                        "[Huddle01] Could not stop screen share:",
+                        stopErr
+                    );
                 }
                 setState((prev) => ({ ...prev, isScreenSharing: false }));
-                
+
                 // Clean up screen share element
                 if (screenShareRef.current) {
-                    const videos = screenShareRef.current.querySelectorAll("video");
+                    const videos =
+                        screenShareRef.current.querySelectorAll("video");
                     videos.forEach((video) => {
                         const stream = video.srcObject as MediaStream;
                         if (stream) {
