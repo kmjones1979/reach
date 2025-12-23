@@ -292,17 +292,24 @@ export function useHuddle01Call(userAddress: string | null) {
                 // Pre-request permissions for iOS Safari
                 // This helps iOS properly prompt for permissions before the SDK tries to use them
                 try {
-                    console.log("[Huddle01] Pre-requesting media permissions...");
+                    console.log(
+                        "[Huddle01] Pre-requesting media permissions..."
+                    );
                     const mediaConstraints: MediaStreamConstraints = {
                         audio: true,
                         video: withVideo,
                     };
-                    const preStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+                    const preStream = await navigator.mediaDevices.getUserMedia(
+                        mediaConstraints
+                    );
                     // Stop the tracks immediately - we just needed to prompt for permission
                     preStream.getTracks().forEach((track) => track.stop());
                     console.log("[Huddle01] Media permissions granted");
                 } catch (permError) {
-                    console.warn("[Huddle01] Could not get media permissions:", permError);
+                    console.warn(
+                        "[Huddle01] Could not get media permissions:",
+                        permError
+                    );
                     // Don't fail - the SDK might still work or give a better error
                 }
 
@@ -636,7 +643,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                 existingVideo.srcObject = stream;
                                 // iOS requires explicit play() call
                                 existingVideo.play().catch((e) => {
-                                    console.warn("[Huddle01] Local video play failed:", e);
+                                    console.warn(
+                                        "[Huddle01] Local video play failed:",
+                                        e
+                                    );
                                 });
                                 console.log(
                                     "[Huddle01] Updated existing local video element"
@@ -648,7 +658,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                 videoEl.autoplay = true;
                                 videoEl.playsInline = true;
                                 // iOS-specific attributes
-                                videoEl.setAttribute("webkit-playsinline", "true");
+                                videoEl.setAttribute(
+                                    "webkit-playsinline",
+                                    "true"
+                                );
                                 videoEl.muted = true;
                                 videoEl.style.width = "100%";
                                 videoEl.style.height = "100%";
@@ -659,7 +672,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                 localVideoRef.current.appendChild(videoEl);
                                 // iOS requires explicit play() call
                                 videoEl.play().catch((e) => {
-                                    console.warn("[Huddle01] Local video play failed:", e);
+                                    console.warn(
+                                        "[Huddle01] Local video play failed:",
+                                        e
+                                    );
                                 });
                                 console.log(
                                     "[Huddle01] Local video element created"
@@ -783,9 +799,14 @@ export function useHuddle01Call(userAddress: string | null) {
                                         remoteAudioRef.current.srcObject =
                                             stream;
                                         // iOS requires explicit play() call
-                                        remoteAudioRef.current.play().catch((e) => {
-                                            console.warn("[Huddle01] Audio play failed (iOS may need user gesture):", e);
-                                        });
+                                        remoteAudioRef.current
+                                            .play()
+                                            .catch((e) => {
+                                                console.warn(
+                                                    "[Huddle01] Audio play failed (iOS may need user gesture):",
+                                                    e
+                                                );
+                                            });
                                         setState((prev) => ({
                                             ...prev,
                                             isRemoteMuted: false,
@@ -800,13 +821,22 @@ export function useHuddle01Call(userAddress: string | null) {
                                         audioEl.srcObject = stream;
                                         audioEl.autoplay = true;
                                         // iOS-specific attributes
-                                        audioEl.setAttribute("playsinline", "true");
-                                        audioEl.setAttribute("webkit-playsinline", "true");
+                                        audioEl.setAttribute(
+                                            "playsinline",
+                                            "true"
+                                        );
+                                        audioEl.setAttribute(
+                                            "webkit-playsinline",
+                                            "true"
+                                        );
                                         document.body.appendChild(audioEl);
                                         remoteAudioRef.current = audioEl;
                                         // iOS requires explicit play() call
                                         audioEl.play().catch((e) => {
-                                            console.warn("[Huddle01] Audio play failed (iOS may need user gesture):", e);
+                                            console.warn(
+                                                "[Huddle01] Audio play failed (iOS may need user gesture):",
+                                                e
+                                            );
                                         });
                                         setState((prev) => ({
                                             ...prev,
@@ -829,7 +859,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                             existingVideo.srcObject = stream;
                                             // iOS requires explicit play() call
                                             existingVideo.play().catch((e) => {
-                                                console.warn("[Huddle01] Video play failed:", e);
+                                                console.warn(
+                                                    "[Huddle01] Video play failed:",
+                                                    e
+                                                );
                                             });
                                             setState((prev) => ({
                                                 ...prev,
@@ -847,7 +880,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                             videoEl.autoplay = true;
                                             videoEl.playsInline = true;
                                             // iOS-specific attributes
-                                            videoEl.setAttribute("webkit-playsinline", "true");
+                                            videoEl.setAttribute(
+                                                "webkit-playsinline",
+                                                "true"
+                                            );
                                             videoEl.muted = false; // Ensure not muted for remote
                                             videoEl.style.width = "100%";
                                             videoEl.style.height = "100%";
@@ -858,7 +894,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                             );
                                             // iOS requires explicit play() call
                                             videoEl.play().catch((e) => {
-                                                console.warn("[Huddle01] Video play failed:", e);
+                                                console.warn(
+                                                    "[Huddle01] Video play failed:",
+                                                    e
+                                                );
                                             });
                                             setState((prev) => ({
                                                 ...prev,

@@ -1987,7 +1987,7 @@ function DashboardContent({
                             </div>
                         </div>
 
-                        {/* Decentralized Calls Toggle */}
+                        {/* Censorship Resistance Toggle */}
                         <div className="px-6 py-4 border-b border-zinc-800">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -2008,11 +2008,11 @@ function DashboardContent({
                                     </div>
                                     <div>
                                         <p className="text-white font-medium">
-                                            Decentralized Calls
+                                            Censorship Resistance
                                         </p>
                                         <p className="text-zinc-500 text-xs">
                                             {userSettings.decentralizedCalls
-                                                ? "Using Huddle01 (Web3)"
+                                                ? "Using Web3"
                                                 : "Using Agora (Centralized)"}
                                         </p>
                                     </div>
