@@ -33,7 +33,7 @@ type FriendsListProps = {
     isCallActive: boolean;
     unreadCounts?: Record<string, number>;
     hideChat?: boolean;
-    friendsXMTPStatus?: Record<string, boolean>; // address -> can receive XMTP
+    friendsWakuStatus?: Record<string, boolean>; // address -> can receive Waku messages
 };
 
 export function FriendsList({
@@ -45,7 +45,7 @@ export function FriendsList({
     isCallActive,
     unreadCounts = {},
     hideChat = false,
-    friendsXMTPStatus = {},
+    friendsWakuStatus = {},
 }: FriendsListProps) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [friendStatuses, setFriendStatuses] = useState<
@@ -431,7 +431,7 @@ export function FriendsList({
                                     {/* Chat Button - hidden on small mobile, shown on sm+ */}
                                     {!hideChat &&
                                         onChat &&
-                                        friendsXMTPStatus[
+                                        friendsWakuStatus[
                                             friend.address.toLowerCase()
                                         ] !== false && (
                                             <div className="relative hidden sm:block">
@@ -440,12 +440,12 @@ export function FriendsList({
                                                         onChat(friend)
                                                     }
                                                     disabled={
-                                                        friendsXMTPStatus[
+                                                        friendsWakuStatus[
                                                             friend.address.toLowerCase()
                                                         ] === undefined
                                                     }
                                                     className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors ${
-                                                        friendsXMTPStatus[
+                                                        friendsWakuStatus[
                                                             friend.address.toLowerCase()
                                                         ] === undefined
                                                             ? "bg-zinc-700/50 text-zinc-500 cursor-not-allowed"
@@ -601,7 +601,7 @@ export function FriendsList({
                                             {/* Chat - Mobile */}
                                             {!hideChat &&
                                                 onChat &&
-                                                friendsXMTPStatus[
+                                                friendsWakuStatus[
                                                     friend.address.toLowerCase()
                                                 ] !== false && (
                                                     <button
@@ -610,12 +610,12 @@ export function FriendsList({
                                                             setExpandedId(null);
                                                         }}
                                                         disabled={
-                                                            friendsXMTPStatus[
+                                                            friendsWakuStatus[
                                                                 friend.address.toLowerCase()
                                                             ] === undefined
                                                         }
                                                         className={`flex-1 py-2.5 px-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${
-                                                            friendsXMTPStatus[
+                                                            friendsWakuStatus[
                                                                 friend.address.toLowerCase()
                                                             ] === undefined
                                                                 ? "bg-zinc-700/50 text-zinc-500 cursor-not-allowed"

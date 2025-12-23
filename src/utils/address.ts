@@ -26,3 +26,4 @@ export function isSolanaAddress(address: string): boolean {
     const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     return base58Regex.test(address);
 }
+

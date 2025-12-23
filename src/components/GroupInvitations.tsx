@@ -34,7 +34,7 @@ export function GroupInvitations({
         try {
             const result = await onAccept(invitation.id);
             if (result.success && result.groupId) {
-                // Join the XMTP group
+                // Join the Waku group
                 await onJoinGroup(result.groupId);
             } else if (!result.success) {
                 setError(result.error || "Failed to accept invitation");

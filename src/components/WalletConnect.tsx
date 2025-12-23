@@ -175,3 +175,4 @@ export function WalletConnect() {
         </motion.div>
     );
 }
+

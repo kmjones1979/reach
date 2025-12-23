@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { type Address } from "viem";
-import { useXMTPContext } from "@/context/XMTPProvider";
+import { useXMTPContext } from "@/context/WakuProvider";
 import { PixelArtEditor } from "./PixelArtEditor";
 import { useReactions, REACTION_EMOJIS } from "@/hooks/useReactions";
 
@@ -56,7 +56,7 @@ export function ChatModal({
     const {
         isInitialized,
         isInitializing,
-        error: xmtpError,
+        error: wakuError,
         userInboxId,
         initialize,
         sendMessage,
@@ -77,7 +77,7 @@ export function ChatModal({
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // Initialize XMTP when modal opens
+    // Initialize Waku when modal opens
     useEffect(() => {
         if (isOpen && !isInitialized && !isInitializing) {
             initialize();
@@ -114,7 +114,7 @@ export function ChatModal({
                     if (!canChat) {
                         setChatState("error");
                         setChatError(
-                            `${displayName} hasn't enabled XMTP yet. They need to click "Enable Chat" in Spritz first.`
+                            `${displayName} hasn't enabled chat yet. They need to click "Enable Chat" in Spritz first.`
                         );
                         return;
                     }
@@ -123,78 +123,91 @@ export function ChatModal({
                 setChatState("loading");
                 setChatError(null);
 
+                // Try to load existing messages (with timeout protection in provider)
                 console.log("[Chat] Loading messages for", peerAddress);
-                const existingMessages = await getMessages(peerAddress);
-                console.log("[Chat] Got messages:", existingMessages.length);
+                try {
+                    const existingMessages = await getMessages(peerAddress);
+                    console.log(
+                        "[Chat] Got messages:",
+                        existingMessages.length
+                    );
 
-                // Filter and format messages - only include text messages, not system messages
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const formattedMessages: Message[] = existingMessages
-                    .filter((msg: any) => {
-                        // Only include messages with string content (actual text messages)
-                        // Filter out system messages (membership changes, etc.) which have object content
-                        return (
-                            typeof msg.content === "string" &&
-                            msg.content.trim() !== ""
-                        );
-                    })
-                    .map((msg: any) => ({
-                        id: msg.id,
-                        content: msg.content,
-                        senderAddress: msg.senderInboxId,
-                        // Handle BigInt timestamp - convert to Number first
-                        sentAt: new Date(Number(msg.sentAtNs) / 1000000),
-                    }));
-
-                setMessages(formattedMessages);
-                setChatState("ready");
-
-                // Mark messages as read since chat is now open
-                markAsRead(peerAddress);
-
-                // Start streaming new messages
-                const stream = await streamMessages(
-                    peerAddress,
-                    (message: unknown) => {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const msg = message as any;
-
-                        // Only process text messages, skip system messages
-                        if (
-                            typeof msg.content !== "string" ||
-                            msg.content.trim() === ""
-                        ) {
-                            return;
-                        }
-
-                        const newMsg: Message = {
+                    // Filter and format messages
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const formattedMessages: Message[] = existingMessages
+                        .filter((msg: any) => {
+                            return (
+                                typeof msg.content === "string" &&
+                                msg.content.trim() !== ""
+                            );
+                        })
+                        .map((msg: any) => ({
                             id: msg.id,
                             content: msg.content,
                             senderAddress: msg.senderInboxId,
-                            // Handle BigInt timestamp
                             sentAt: new Date(Number(msg.sentAtNs) / 1000000),
-                        };
-                        setMessages((prev) => {
-                            // Avoid duplicates
-                            if (prev.some((m) => m.id === newMsg.id))
-                                return prev;
-                            return [...prev, newMsg];
-                        });
+                        }));
 
-                        // Mark as read immediately since chat is open
-                        markAsRead(peerAddress);
-                    }
-                );
+                    setMessages(formattedMessages);
+                } catch (loadErr) {
+                    console.log(
+                        "[Chat] Failed to load messages, continuing anyway:",
+                        loadErr
+                    );
+                }
 
-                streamRef.current = stream;
+                // Set to ready regardless of load success so we can send/receive
+                setChatState("ready");
+                markAsRead(peerAddress);
+
+                // Start streaming new messages
+                console.log("[Chat] Setting up message stream...");
+                try {
+                    const stream = await streamMessages(
+                        peerAddress,
+                        (message: unknown) => {
+                            console.log(
+                                "[Chat] Received streamed message:",
+                                message
+                            );
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const msg = message as any;
+
+                            if (
+                                typeof msg.content !== "string" ||
+                                msg.content.trim() === ""
+                            ) {
+                                return;
+                            }
+
+                            const newMsg: Message = {
+                                id: msg.id,
+                                content: msg.content,
+                                senderAddress: msg.senderInboxId,
+                                sentAt: new Date(
+                                    Number(msg.sentAtNs) / 1000000
+                                ),
+                            };
+                            setMessages((prev) => {
+                                if (prev.some((m) => m.id === newMsg.id))
+                                    return prev;
+                                return [...prev, newMsg];
+                            });
+                            markAsRead(peerAddress);
+                        }
+                    );
+                    console.log("[Chat] Stream setup complete:", stream);
+                    streamRef.current = stream;
+                } catch (streamErr) {
+                    console.log(
+                        "[Chat] Failed to setup stream, relying on polling:",
+                        streamErr
+                    );
+                }
             } catch (error) {
-                console.error("[Chat] Error loading messages:", error);
-                setChatState("error");
-                setChatError(
-                    error instanceof Error
-                        ? error.message
-                        : "Failed to load messages. Please try again."
-                );
+                console.error("[Chat] Error in chat setup:", error);
+                // Still set to ready so user can try to send messages
+                setChatState("ready");
             }
         };
 
@@ -218,15 +231,77 @@ export function ChatModal({
         markAsRead,
     ]);
 
+    // Polling fallback for messages (since Waku Filter can be unreliable)
+    useEffect(() => {
+        if (!isOpen || !isInitialized || chatState !== "ready") return;
+
+        const pollInterval = setInterval(async () => {
+            try {
+                // Force refresh to get latest messages from the network
+                const newMessages = await getMessages(peerAddress, true);
+                if (newMessages.length > 0) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const formattedMessages: Message[] = newMessages
+                        .filter((msg: any) => {
+                            return (
+                                typeof msg.content === "string" &&
+                                msg.content.trim() !== ""
+                            );
+                        })
+                        .map((msg: any) => ({
+                            id: msg.id,
+                            content: msg.content,
+                            senderAddress: msg.senderInboxId,
+                            sentAt: new Date(Number(msg.sentAtNs) / 1000000),
+                        }));
+
+                    setMessages((prev) => {
+                        // Merge new messages, avoiding duplicates
+                        const existingIds = new Set(prev.map((m) => m.id));
+                        const newOnes = formattedMessages.filter(
+                            (m) => !existingIds.has(m.id)
+                        );
+                        if (newOnes.length > 0) {
+                            console.log(
+                                "[Chat] Polling found new messages:",
+                                newOnes.length
+                            );
+                            return [...prev, ...newOnes].sort(
+                                (a, b) =>
+                                    a.sentAt.getTime() - b.sentAt.getTime()
+                            );
+                        }
+                        return prev;
+                    });
+                }
+            } catch (err) {
+                console.log("[Chat] Polling error:", err);
+            }
+        }, 3000); // Poll every 3 seconds
+
+        return () => clearInterval(pollInterval);
+    }, [isOpen, isInitialized, chatState, peerAddress, getMessages]);
+
     const handleSend = useCallback(async () => {
         if (!newMessage.trim() || isSending) return;
 
+        const messageContent = newMessage.trim();
         setIsSending(true);
         setChatError(null);
         try {
-            const result = await sendMessage(peerAddress, newMessage.trim());
+            const result = await sendMessage(peerAddress, messageContent);
             if (result.success) {
                 setNewMessage("");
+                // Add the sent message to the UI immediately
+                if (result.message && userAddress) {
+                    const sentMessage: Message = {
+                        id: result.message.id || `sent-${Date.now()}`,
+                        content: messageContent,
+                        senderAddress: userAddress.toLowerCase(),
+                        sentAt: new Date(),
+                    };
+                    setMessages((prev) => [...prev, sentMessage]);
+                }
             } else {
                 setChatError(
                     `Failed to send: ${result.error || "Unknown error"}`
@@ -242,7 +317,7 @@ export function ChatModal({
         } finally {
             setIsSending(false);
         }
-    }, [newMessage, isSending, sendMessage, peerAddress]);
+    }, [newMessage, isSending, sendMessage, peerAddress, userAddress]);
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -280,6 +355,17 @@ export function ChatModal({
 
                 if (!result.success) {
                     throw new Error(result.error || "Failed to send");
+                }
+
+                // Add the sent pixel art message to the UI immediately
+                if (result.message && userAddress) {
+                    const sentMessage: Message = {
+                        id: result.message.id || `sent-${Date.now()}`,
+                        content: pixelArtMessage,
+                        senderAddress: userAddress.toLowerCase(),
+                        sentAt: new Date(),
+                    };
+                    setMessages((prev) => [...prev, sentMessage]);
                 }
 
                 setShowPixelArt(false);
@@ -409,7 +495,7 @@ export function ChatModal({
                                                 />
                                             </svg>
                                             <p className="text-zinc-400">
-                                                Initializing XMTP...
+                                                Initializing Waku...
                                             </p>
                                             <p className="text-zinc-500 text-sm mt-1">
                                                 Please sign the message in your
@@ -419,10 +505,10 @@ export function ChatModal({
                                     </div>
                                 )}
 
-                                {(xmtpError || chatError) && (
+                                {(wakuError || chatError) && (
                                     <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
                                         <p className="text-red-400">
-                                            {xmtpError || chatError}
+                                            {wakuError || chatError}
                                         </p>
                                         {chatState === "error" &&
                                             !bypassCheck && (
@@ -469,7 +555,12 @@ export function ChatModal({
                                         </div>
                                     )}
 
-                                {messages.map((msg) => {
+                                {/* Deduplicate messages by ID before rendering */}
+                                {Array.from(
+                                    new Map(
+                                        messages.map((m) => [m.id, m])
+                                    ).values()
+                                ).map((msg) => {
                                     const isOwn = userInboxId
                                         ? msg.senderAddress === userInboxId
                                         : false;
@@ -844,7 +935,7 @@ export function ChatModal({
                                 </div>
                                 <p className="text-zinc-600 text-xs text-center mt-2">
                                     Powered by{" "}
-                                    <span className="text-[#FFBBA7]">XMTP</span>{" "}
+                                    <span className="text-[#FFBBA7]">Waku</span>{" "}
                                     • End-to-end encrypted
                                 </p>
                             </div>

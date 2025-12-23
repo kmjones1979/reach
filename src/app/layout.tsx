@@ -106,7 +106,7 @@ export default function RootLayout({
                     rel="apple-touch-icon"
                     href="/icons/apple-touch-icon.png"
                 />
-                {/* Suppress known AppKit/Solana/XMTP errors before React loads */}
+                {/* Suppress known AppKit/Solana/Waku errors before React loads */}
                 <script
                     dangerouslySetInnerHTML={{
                         __html: `
@@ -114,8 +114,8 @@ export default function RootLayout({
                                 var suppressedErrors = [
                                     'Endpoint URL must start with',
                                     'No project ID is configured',
-                                    'Group is inactive',
-                                    'Errors Occured During Sync'
+                                    'Failed to dial',
+                                    'Connection refused'
                                 ];
                                 window.addEventListener('error', function(e) {
                                     var msg = e.message || (e.error && e.error.message) || '';
@@ -137,7 +137,7 @@ export default function RootLayout({
                                         }
                                     }
                                 }, true);
-                                // Also suppress console.error for these XMTP messages
+                                // Also suppress console.error for these Waku messages
                                 var origError = console.error;
                                 console.error = function() {
                                     var msg = Array.prototype.join.call(arguments, ' ');

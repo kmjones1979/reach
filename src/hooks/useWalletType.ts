@@ -73,3 +73,4 @@ export function isEvmAddress(address: string): boolean {
     if (!address) return false;
     return /^0x[a-fA-F0-9]{40}$/.test(address);
 }
+

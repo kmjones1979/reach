@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { type Address } from "viem";
-import { useXMTPContext, type XMTPGroup } from "@/context/XMTPProvider";
+import { useXMTPContext, type XMTPGroup } from "@/context/WakuProvider";
 import { PixelArtEditor } from "./PixelArtEditor";
 
 type Friend = {

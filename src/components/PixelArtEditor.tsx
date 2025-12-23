@@ -678,3 +678,4 @@ export function PixelArtEditor({
         </AnimatePresence>
     );
 }
+

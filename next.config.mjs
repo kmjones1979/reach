@@ -140,3 +140,4 @@ const nextConfig = {
 };
 
 export default withPWA(nextConfig);
+

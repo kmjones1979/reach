@@ -17,7 +17,7 @@ import { IncomingCallModal } from "./IncomingCallModal";
 import { ChatModal } from "./ChatModal";
 import { UsernameClaimModal } from "./UsernameClaimModal";
 import { PhoneVerificationModal } from "./PhoneVerificationModal";
-import { XMTPProvider, useXMTPContext } from "@/context/XMTPProvider";
+import { XMTPProvider, useXMTPContext } from "@/context/WakuProvider";
 import { useUsername } from "@/hooks/useUsername";
 import { usePhoneVerification } from "@/hooks/usePhoneVerification";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -34,7 +34,7 @@ import { GroupChatModal } from "./GroupChatModal";
 import { GroupsList } from "./GroupsList";
 import { GroupCallUI } from "./GroupCallUI";
 import { IncomingGroupCallModal } from "./IncomingGroupCallModal";
-import { type XMTPGroup } from "@/context/XMTPProvider";
+import { type XMTPGroup } from "@/context/WakuProvider";
 import { useGroupCallSignaling } from "@/hooks/useGroupCallSignaling";
 import { useGroupInvitations } from "@/hooks/useGroupInvitations";
 import { GroupInvitations } from "./GroupInvitations";
@@ -76,7 +76,7 @@ function DashboardContent({
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isQRCodeModalOpen, setIsQRCodeModalOpen] = useState(false);
     const [isSocialsModalOpen, setIsSocialsModalOpen] = useState(false);
-    const [showXMTPSuccess, setShowXMTPSuccess] = useState(false);
+    const [showWakuSuccess, setShowWakuSuccess] = useState(false);
     const [currentCallFriend, setCurrentCallFriend] =
         useState<FriendsListFriend | null>(null);
     const [chatFriend, setChatFriend] = useState<FriendsListFriend | null>(
@@ -89,7 +89,7 @@ function DashboardContent({
         ensName: null,
         avatar: null,
     });
-    const xmtpAutoInitAttempted = useRef(false);
+    const wakuAutoInitAttempted = useRef(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
 
     // Group chat state
@@ -284,53 +284,53 @@ function DashboardContent({
         clearRemoteHangup,
     } = useCallSignaling(userAddress);
 
-    // XMTP is only available for EVM users (not Solana)
+    // Waku is only available for EVM users (not Solana)
     // Use a safe wrapper that returns defaults for Solana users
-    const xmtpContext = isSolanaUser ? null : useXMTPContext();
+    const wakuContext = isSolanaUser ? null : useXMTPContext();
 
-    const isXMTPInitialized = xmtpContext?.isInitialized ?? false;
-    const isXMTPInitializing = xmtpContext?.isInitializing ?? false;
-    const xmtpError = xmtpContext?.error ?? null;
-    const unreadCounts = xmtpContext?.unreadCounts ?? {};
-    const initializeXMTP = xmtpContext?.initialize ?? (() => Promise.resolve());
-    const markAsRead = xmtpContext?.markAsRead ?? (() => {});
-    const onNewMessage = xmtpContext?.onNewMessage ?? (() => () => {});
+    const isWakuInitialized = wakuContext?.isInitialized ?? false;
+    const isWakuInitializing = wakuContext?.isInitializing ?? false;
+    const wakuError = wakuContext?.error ?? null;
+    const unreadCounts = wakuContext?.unreadCounts ?? {};
+    const initializeWaku = wakuContext?.initialize ?? (() => Promise.resolve());
+    const markAsRead = wakuContext?.markAsRead ?? (() => {});
+    const onNewMessage = wakuContext?.onNewMessage ?? (() => () => {});
     const canMessageBatch =
-        xmtpContext?.canMessageBatch ??
+        wakuContext?.canMessageBatch ??
         (() => Promise.resolve({} as Record<string, boolean>));
     const revokeAllInstallations =
-        xmtpContext?.revokeAllInstallations ?? (() => Promise.resolve(false));
+        wakuContext?.revokeAllInstallations ?? (() => Promise.resolve(false));
     // Group methods
     const createGroup =
-        xmtpContext?.createGroup ??
+        wakuContext?.createGroup ??
         (() =>
             Promise.resolve({
                 success: false,
-                error: "XMTP not available for Solana wallets",
+                error: "Waku not available for Solana wallets",
             }));
-    const getGroups = xmtpContext?.getGroups ?? (() => Promise.resolve([]));
-    const markGroupAsRead = xmtpContext?.markGroupAsRead ?? (() => {});
+    const getGroups = wakuContext?.getGroups ?? (() => Promise.resolve([]));
+    const markGroupAsRead = wakuContext?.markGroupAsRead ?? (() => {});
     const joinGroupById =
-        xmtpContext?.joinGroupById ??
+        wakuContext?.joinGroupById ??
         (() =>
             Promise.resolve({
                 success: false,
-                error: "XMTP not available for Solana wallets",
+                error: "Waku not available for Solana wallets",
             }));
     const addGroupMembers =
-        xmtpContext?.addGroupMembers ?? (() => Promise.resolve(false));
-    const leaveGroup = xmtpContext?.leaveGroup ?? (() => Promise.resolve());
+        wakuContext?.addGroupMembers ?? (() => Promise.resolve(false));
+    const leaveGroup = wakuContext?.leaveGroup ?? (() => Promise.resolve());
 
-    // State for revoking XMTP installations
+    // State for reconnecting (kept for API compatibility)
     const [isRevokingInstallations, setIsRevokingInstallations] =
         useState(false);
 
-    // Check if the error is an installation limit error
+    // Check if the error is a connection error
     const isInstallationLimitError =
-        xmtpError &&
-        (xmtpError.toLowerCase().includes("installation") ||
-            xmtpError.includes("10/10") ||
-            xmtpError.toLowerCase().includes("revoke"));
+        wakuError &&
+        (wakuError.toLowerCase().includes("connection") ||
+            wakuError.includes("peer") ||
+            wakuError.toLowerCase().includes("timeout"));
 
     // Handler for revoking installations
     const handleRevokeInstallations = async () => {
@@ -339,7 +339,7 @@ function DashboardContent({
             const success = await revokeAllInstallations();
             if (success) {
                 // Auto-retry initialization after successful revoke
-                await initializeXMTP();
+                await initializeWaku();
             }
         } finally {
             setIsRevokingInstallations(false);
@@ -352,40 +352,40 @@ function DashboardContent({
         sender: string;
     } | null>(null);
 
-    // Track which friends can receive XMTP messages
-    const [friendsXMTPStatus, setFriendsXMTPStatus] = useState<
+    // Track which friends can receive Waku messages
+    const [friendsWakuStatus, setFriendsWakuStatus] = useState<
         Record<string, boolean>
     >({});
 
-    // Auto-initialize XMTP after a short delay (EVM users only)
+    // Auto-initialize Waku after a short delay (EVM users only)
     useEffect(() => {
-        // Skip for Solana users - XMTP not supported
+        // Skip for Solana users - Waku not supported
         if (isSolanaUser) return;
 
         if (
-            !isXMTPInitialized &&
-            !isXMTPInitializing &&
-            !xmtpAutoInitAttempted.current
+            !isWakuInitialized &&
+            !isWakuInitializing &&
+            !wakuAutoInitAttempted.current
         ) {
-            xmtpAutoInitAttempted.current = true;
-            // Small delay to let the UI settle, then prompt for XMTP signature
+            wakuAutoInitAttempted.current = true;
+            // Small delay to let the UI settle, then initialize Waku
             const timer = setTimeout(() => {
-                initializeXMTP();
+                initializeWaku();
             }, 1500);
             return () => clearTimeout(timer);
         }
-    }, [isSolanaUser, isXMTPInitialized, isXMTPInitializing, initializeXMTP]);
+    }, [isSolanaUser, isWakuInitialized, isWakuInitializing, initializeWaku]);
 
-    // Show XMTP success message briefly when initialized (EVM users only)
+    // Show Waku success message briefly when initialized (EVM users only)
     useEffect(() => {
-        if (isXMTPInitialized && !isPasskeyUser && !isSolanaUser) {
-            setShowXMTPSuccess(true);
+        if (isWakuInitialized && !isPasskeyUser && !isSolanaUser) {
+            setShowWakuSuccess(true);
             const timer = setTimeout(() => {
-                setShowXMTPSuccess(false);
+                setShowWakuSuccess(false);
             }, 4000); // Hide after 4 seconds
             return () => clearTimeout(timer);
         }
-    }, [isXMTPInitialized, isPasskeyUser, isSolanaUser]);
+    }, [isWakuInitialized, isPasskeyUser, isSolanaUser]);
 
     // Handler to switch to mainnet
     const handleSwitchToMainnet = async () => {
@@ -426,24 +426,24 @@ function DashboardContent({
         addedAt: f.created_at,
     }));
 
-    // Check which friends can receive XMTP messages (EVM users only)
+    // Check which friends can receive Waku messages (EVM users only)
     useEffect(() => {
         if (isPasskeyUser || isSolanaUser || friends.length === 0) {
             return;
         }
 
-        const checkFriendsXMTP = async () => {
+        const checkFriendsWaku = async () => {
             const addresses = friends.map((f) => f.friend_address);
             const status = await canMessageBatch(addresses);
-            setFriendsXMTPStatus(status);
+            setFriendsWakuStatus(status);
         };
 
-        checkFriendsXMTP();
+        checkFriendsWaku();
     }, [friends, isPasskeyUser, isSolanaUser, canMessageBatch]);
 
-    // Load groups when XMTP is initialized (EVM users only)
+    // Load groups when Waku is initialized (EVM users only)
     useEffect(() => {
-        if (!isXMTPInitialized || isPasskeyUser || isSolanaUser) return;
+        if (!isWakuInitialized || isPasskeyUser || isSolanaUser) return;
 
         const loadGroups = async () => {
             setIsLoadingGroups(true);
@@ -458,7 +458,7 @@ function DashboardContent({
         };
 
         loadGroups();
-    }, [isXMTPInitialized, isPasskeyUser, isSolanaUser, getGroups]);
+    }, [isWakuInitialized, isPasskeyUser, isSolanaUser, getGroups]);
 
     // Handler to create a new group
     const handleCreateGroup = async (
@@ -468,7 +468,7 @@ function DashboardContent({
         setIsCreatingGroup(true);
         try {
             // Create the group WITH all members immediately
-            // (XMTP requires creator to add members - members can't add themselves)
+            // (Waku requires creator to add members - members can't add themselves)
             const result = await createGroup(memberAddresses, groupName);
             if (!result.success || !result.groupId) {
                 console.error(
@@ -505,7 +505,7 @@ function DashboardContent({
     // Handler to join a group after accepting an invitation
     const handleJoinGroupFromInvite = async (groupId: string) => {
         try {
-            // Join the XMTP group
+            // Join the Waku group
             const result = await joinGroupById(groupId);
             if (result.success) {
                 // Refresh groups list
@@ -730,7 +730,7 @@ function DashboardContent({
 
     // Listen for new messages and show toast + notification (EVM users only)
     useEffect(() => {
-        if (!isXMTPInitialized || isSolanaUser) return;
+        if (!isWakuInitialized || isSolanaUser) return;
 
         const unsubscribe = onNewMessage(({ senderAddress, content }) => {
             // Find friend info for the sender
@@ -762,7 +762,7 @@ function DashboardContent({
 
         return unsubscribe;
     }, [
-        isXMTPInitialized,
+        isWakuInitialized,
         onNewMessage,
         friendsListData,
         notifyMessage,
@@ -1738,7 +1738,7 @@ function DashboardContent({
                                         <p className="text-[#FFF0E0]/70 text-sm mt-1">
                                             Voice calls are available! Encrypted
                                             chat requires an Ethereum wallet
-                                            (XMTP limitation).
+                                            (requires EVM wallet).
                                         </p>
                                     </div>
                                 </div>
@@ -1746,8 +1746,8 @@ function DashboardContent({
                         </motion.div>
                     )}
 
-                    {/* XMTP Status Banner - hidden for passkey users and Solana users */}
-                    {!isXMTPInitialized && !isPasskeyUser && !isSolanaUser && (
+                    {/* Waku Status Banner - hidden for passkey users and Solana users */}
+                    {!isWakuInitialized && !isPasskeyUser && !isSolanaUser && (
                         <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -1770,16 +1770,15 @@ function DashboardContent({
                                     </svg>
                                     <div>
                                         <p className="text-[#FFF0E0] font-medium">
-                                            Enable XMTP Chat
+                                            Enable Waku Chat
                                         </p>
                                         <p className="text-[#FFF0E0]/70 text-sm mt-1">
-                                            Sign a message to enable encrypted
-                                            messaging. Your friends also need to
-                                            enable XMTP to chat.
+                                            Connecting to the Waku network for
+                                            encrypted peer-to-peer messaging.
                                         </p>
-                                        {xmtpError && (
+                                        {wakuError && (
                                             <p className="text-red-400 text-sm mt-1">
-                                                {xmtpError}
+                                                {wakuError}
                                             </p>
                                         )}
                                     </div>
@@ -1790,7 +1789,7 @@ function DashboardContent({
                                             onClick={handleRevokeInstallations}
                                             disabled={
                                                 isRevokingInstallations ||
-                                                isXMTPInitializing
+                                                isWakuInitializing
                                             }
                                             className="py-2 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                                         >
@@ -1824,11 +1823,11 @@ function DashboardContent({
                                     )}
                                     {!isInstallationLimitError && (
                                         <button
-                                            onClick={initializeXMTP}
-                                            disabled={isXMTPInitializing}
+                                            onClick={initializeWaku}
+                                            disabled={isWakuInitializing}
                                             className="py-2 px-4 rounded-lg bg-[#FF5500] hover:bg-[#E04D00] text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                                         >
-                                            {isXMTPInitializing ? (
+                                            {isWakuInitializing ? (
                                                 <>
                                                     <svg
                                                         className="w-4 h-4 animate-spin"
@@ -1861,9 +1860,9 @@ function DashboardContent({
                         </motion.div>
                     )}
 
-                    {/* XMTP Enabled Success - auto-dismisses after 4 seconds */}
+                    {/* Waku Enabled Success - auto-dismisses after 4 seconds */}
                     <AnimatePresence>
-                        {showXMTPSuccess && (
+                        {showWakuSuccess && (
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -1885,7 +1884,7 @@ function DashboardContent({
                                         />
                                     </svg>
                                     <p className="text-emerald-200 font-medium">
-                                        XMTP Chat Enabled! You can now send and
+                                        Waku Chat Enabled! You can now send and
                                         receive encrypted messages.
                                     </p>
                                 </div>
@@ -1962,13 +1961,13 @@ function DashboardContent({
                                         : unreadCounts
                                 }
                                 hideChat={isPasskeyUser || isSolanaUser}
-                                friendsXMTPStatus={friendsXMTPStatus}
+                                friendsWakuStatus={friendsWakuStatus}
                             />
                         </div>
                     </div>
 
                     {/* Group Invitations Section */}
-                    {isXMTPInitialized &&
+                    {isWakuInitialized &&
                         !isPasskeyUser &&
                         !isSolanaUser &&
                         pendingInvitations.length > 0 && (
@@ -1980,7 +1979,7 @@ function DashboardContent({
                                         invitationId: string,
                                         groupId: string
                                     ) => {
-                                        // First leave/hide the XMTP group
+                                        // First leave/hide the Waku group
                                         await leaveGroup(groupId);
                                         // Then mark the invitation as declined
                                         const result = await declineInvitation(
@@ -1996,8 +1995,8 @@ function DashboardContent({
                             </div>
                         )}
 
-                    {/* Groups Section - Only show if XMTP is enabled (EVM users only) */}
-                    {isXMTPInitialized && !isPasskeyUser && !isSolanaUser && (
+                    {/* Groups Section - Only show if Waku is enabled (EVM users only) */}
+                    {isWakuInitialized && !isPasskeyUser && !isSolanaUser && (
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6">
                             <div className="p-6 border-b border-zinc-800">
                                 <div className="flex items-center justify-between">
@@ -2365,14 +2364,14 @@ function DashboardContent({
     );
 }
 
-// Wrapper that provides XMTP context
+// Wrapper that provides Waku context
 export function Dashboard({
     userAddress,
     onLogout,
     isPasskeyUser,
     walletType,
 }: DashboardProps) {
-    // Only wrap with XMTPProvider for EVM users (XMTP doesn't support Solana)
+    // Only wrap with WakuProvider for EVM users (Waku doesn't support Solana)
     if (walletType === "solana") {
         return (
             <DashboardContent

@@ -346,3 +346,4 @@ export function usePushNotifications(userAddress: string | null) {
         unsubscribe,
     };
 }
+
