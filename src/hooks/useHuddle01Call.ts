@@ -396,20 +396,25 @@ export function useHuddle01Call(userAddress: string | null) {
                     // Start polling for remote streams - this handles the case where
                     // the other party enables audio/video AFTER we join
                     // On mobile, poll more frequently and for longer
-                    const isMobilePolling = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    const isMobilePolling = /iPhone|iPad|iPod|Android/i.test(
+                        navigator.userAgent
+                    );
                     let pollCount = 0;
                     const maxPolls = isMobilePolling ? 30 : 15; // 30 seconds on mobile, 15 on desktop
                     const pollInterval = isMobilePolling ? 1000 : 1000; // 1 second
-                    
-                    console.log(`[Huddle01] Starting polling (mobile: ${isMobilePolling}, maxPolls: ${maxPolls})`);
-                    
+
+                    console.log(
+                        `[Huddle01] Starting polling (mobile: ${isMobilePolling}, maxPolls: ${maxPolls})`
+                    );
+
                     const pollIntervalId = setInterval(() => {
                         pollCount++;
 
                         // Only stop polling if we have BOTH remote video AND audio
-                        const hasRemoteVideo = (remoteVideoRef.current?.children?.length ?? 0) > 0;
+                        const hasRemoteVideo =
+                            (remoteVideoRef.current?.children?.length ?? 0) > 0;
                         const hasRemoteAudio = remoteAudioRef.current !== null;
-                        
+
                         if (hasRemoteVideo && hasRemoteAudio) {
                             console.log(
                                 "[Huddle01] Remote video AND audio found, stopping poll"
@@ -434,10 +439,14 @@ export function useHuddle01Call(userAddress: string | null) {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const remotePeers = (client.room as any)?.remotePeers;
                         if (remotePeers && remotePeers.size > 0) {
-                            console.log(`[Huddle01] Found ${remotePeers.size} remote peer(s)`);
+                            console.log(
+                                `[Huddle01] Found ${remotePeers.size} remote peer(s)`
+                            );
                             for (const [peerId, peer] of remotePeers) {
-                                console.log(`[Huddle01] Checking peer: ${peerId}`);
-                                
+                                console.log(
+                                    `[Huddle01] Checking peer: ${peerId}`
+                                );
+
                                 // Check for audio FIRST (more important)
                                 try {
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -446,7 +455,7 @@ export function useHuddle01Call(userAddress: string | null) {
                                     ).getConsumer?.("audio");
                                     if (
                                         audioConsumer?.track instanceof
-                                        MediaStreamTrack &&
+                                            MediaStreamTrack &&
                                         !remoteAudioRef.current
                                     ) {
                                         console.log(
@@ -461,30 +470,67 @@ export function useHuddle01Call(userAddress: string | null) {
                                         audioEl.srcObject = audioStream;
                                         audioEl.autoplay = true;
                                         // iOS-specific attributes
-                                        audioEl.setAttribute("playsinline", "true");
-                                        audioEl.setAttribute("webkit-playsinline", "true");
+                                        audioEl.setAttribute(
+                                            "playsinline",
+                                            "true"
+                                        );
+                                        audioEl.setAttribute(
+                                            "webkit-playsinline",
+                                            "true"
+                                        );
                                         document.body.appendChild(audioEl);
                                         remoteAudioRef.current = audioEl;
                                         // iOS requires explicit play() call
                                         audioEl.play().catch((e) => {
-                                            console.warn("[Huddle01] Audio play failed via polling:", e);
+                                            console.warn(
+                                                "[Huddle01] Audio play failed via polling:",
+                                                e
+                                            );
                                         });
                                         setState((prev) => ({
                                             ...prev,
                                             isRemoteMuted: false,
                                         }));
-                                        console.log("[Huddle01] Remote AUDIO created via polling!");
+                                        console.log(
+                                            "[Huddle01] Remote AUDIO created via polling!"
+                                        );
                                     }
                                 } catch (audioErr) {
-                                    console.log("[Huddle01] Audio consumer check failed:", audioErr);
+                                    console.log(
+                                        "[Huddle01] Audio consumer check failed:",
+                                        audioErr
+                                    );
                                 }
-                                
+
                                 // Check for video
                                 try {
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    const videoConsumer = (
-                                        peer as any
-                                    ).getConsumer?.("video");
+                                    const peerAny = peer as any;
+                                    
+                                    // Log what methods/properties are available on peer
+                                    if (pollCount === 1 || pollCount === 5) {
+                                        console.log("[Huddle01] Peer inspection:", {
+                                            peerId,
+                                            hasGetConsumer: typeof peerAny.getConsumer === "function",
+                                            consumers: peerAny.consumers,
+                                            producers: peerAny.producers,
+                                            // Try to list available methods
+                                            methods: Object.keys(peerAny).filter(k => typeof peerAny[k] === "function"),
+                                        });
+                                    }
+                                    
+                                    const videoConsumer = peerAny.getConsumer?.("video");
+                                    
+                                    // Log video consumer details
+                                    if (pollCount <= 3) {
+                                        console.log("[Huddle01] Video consumer check:", {
+                                            hasConsumer: !!videoConsumer,
+                                            consumerType: typeof videoConsumer,
+                                            hasTrack: !!videoConsumer?.track,
+                                            trackType: videoConsumer?.track instanceof MediaStreamTrack ? "MediaStreamTrack" : typeof videoConsumer?.track,
+                                        });
+                                    }
+                                    
                                     if (
                                         videoConsumer?.track instanceof
                                         MediaStreamTrack
@@ -508,7 +554,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                             videoEl.autoplay = true;
                                             videoEl.playsInline = true;
                                             // iOS-specific attributes
-                                            videoEl.setAttribute("webkit-playsinline", "true");
+                                            videoEl.setAttribute(
+                                                "webkit-playsinline",
+                                                "true"
+                                            );
                                             videoEl.style.width = "100%";
                                             videoEl.style.height = "100%";
                                             videoEl.style.objectFit = "cover";
@@ -518,7 +567,10 @@ export function useHuddle01Call(userAddress: string | null) {
                                             );
                                             // iOS requires explicit play() call
                                             videoEl.play().catch((e) => {
-                                                console.warn("[Huddle01] Video play failed via polling:", e);
+                                                console.warn(
+                                                    "[Huddle01] Video play failed via polling:",
+                                                    e
+                                                );
                                             });
                                             setState((prev) => ({
                                                 ...prev,
@@ -540,9 +592,35 @@ export function useHuddle01Call(userAddress: string | null) {
                                                 "[Huddle01] Stored pending video track from polling"
                                             );
                                         }
+                                    } else {
+                                        // Fallback: Try to find video track by iterating consumers
+                                        const consumers = peerAny.consumers || peerAny._consumers;
+                                        if (consumers && typeof consumers.forEach === "function") {
+                                            consumers.forEach((consumer: any, label: string) => {
+                                                if ((label === "video" || consumer?.track?.kind === "video") && 
+                                                    consumer?.track instanceof MediaStreamTrack &&
+                                                    remoteVideoRef.current &&
+                                                    remoteVideoRef.current.children.length === 0) {
+                                                    console.log("[Huddle01] Found VIDEO via consumers iteration:", label);
+                                                    const stream = new MediaStream([consumer.track]);
+                                                    const videoEl = document.createElement("video");
+                                                    videoEl.srcObject = stream;
+                                                    videoEl.autoplay = true;
+                                                    videoEl.playsInline = true;
+                                                    videoEl.setAttribute("webkit-playsinline", "true");
+                                                    videoEl.style.width = "100%";
+                                                    videoEl.style.height = "100%";
+                                                    videoEl.style.objectFit = "cover";
+                                                    videoEl.style.borderRadius = "12px";
+                                                    remoteVideoRef.current.appendChild(videoEl);
+                                                    videoEl.play().catch(() => {});
+                                                    setState((prev) => ({ ...prev, isRemoteVideoOff: false }));
+                                                }
+                                            });
+                                        }
                                     }
                                 } catch (e) {
-                                    // Ignore
+                                    console.log("[Huddle01] Video check error:", e);
                                 }
 
                                 // Also check for audio if we don't have it
@@ -1294,9 +1372,15 @@ export function useHuddle01Call(userAddress: string | null) {
 
                 // Enable audio with retry on mobile
                 let audioEnabled = false;
-                for (let attempt = 1; attempt <= (isMobileDevice ? 3 : 1); attempt++) {
+                for (
+                    let attempt = 1;
+                    attempt <= (isMobileDevice ? 3 : 1);
+                    attempt++
+                ) {
                     try {
-                        console.log(`[Huddle01] Enabling audio (attempt ${attempt})...`);
+                        console.log(
+                            `[Huddle01] Enabling audio (attempt ${attempt})...`
+                        );
                         await localPeer.enableAudio();
                         setState((prev) => ({ ...prev, isMuted: false }));
                         console.log("[Huddle01] Audio enabled successfully");
@@ -1308,8 +1392,12 @@ export function useHuddle01Call(userAddress: string | null) {
                             audioError
                         );
                         if (attempt < 3 && isMobileDevice) {
-                            console.log("[Huddle01] Retrying audio in 500ms...");
-                            await new Promise((resolve) => setTimeout(resolve, 500));
+                            console.log(
+                                "[Huddle01] Retrying audio in 500ms..."
+                            );
+                            await new Promise((resolve) =>
+                                setTimeout(resolve, 500)
+                            );
                         }
                     }
                 }
@@ -1320,12 +1408,23 @@ export function useHuddle01Call(userAddress: string | null) {
                 // Enable video if requested, with retry on mobile
                 if (withVideo) {
                     let videoEnabled = false;
-                    for (let attempt = 1; attempt <= (isMobileDevice ? 3 : 1); attempt++) {
+                    for (
+                        let attempt = 1;
+                        attempt <= (isMobileDevice ? 3 : 1);
+                        attempt++
+                    ) {
                         try {
-                            console.log(`[Huddle01] Enabling video (attempt ${attempt})...`);
+                            console.log(
+                                `[Huddle01] Enabling video (attempt ${attempt})...`
+                            );
                             await localPeer.enableVideo();
-                            setState((prev) => ({ ...prev, isVideoOff: false }));
-                            console.log("[Huddle01] Video enabled successfully");
+                            setState((prev) => ({
+                                ...prev,
+                                isVideoOff: false,
+                            }));
+                            console.log(
+                                "[Huddle01] Video enabled successfully"
+                            );
                             videoEnabled = true;
                             break;
                         } catch (videoError) {
@@ -1334,8 +1433,12 @@ export function useHuddle01Call(userAddress: string | null) {
                                 videoError
                             );
                             if (attempt < 3 && isMobileDevice) {
-                                console.log("[Huddle01] Retrying video in 500ms...");
-                                await new Promise((resolve) => setTimeout(resolve, 500));
+                                console.log(
+                                    "[Huddle01] Retrying video in 500ms..."
+                                );
+                                await new Promise((resolve) =>
+                                    setTimeout(resolve, 500)
+                                );
                             }
                         }
                     }
