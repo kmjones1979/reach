@@ -1193,6 +1193,74 @@ export function WakuProvider({
         };
     }, []);
 
+    // Load initial unread counts from database on startup
+    // This ensures unread indicators persist across page refreshes
+    useEffect(() => {
+        if (!isInitialized || !userAddress || !supabase) return;
+
+        const loadInitialUnreadCounts = async () => {
+            if (!supabase) return;
+            const client = supabase;
+            const userAddrLower = userAddress.toLowerCase();
+            
+            console.log("[Waku] Loading initial unread counts for:", userAddrLower);
+            
+            try {
+                // Get all unread messages for this user (messages where they are recipient)
+                // that don't have a read receipt
+                const { data: unreadMessages, error: msgError } = await client
+                    .from("shout_messages")
+                    .select("sender_address, message_id, created_at")
+                    .eq("recipient_address", userAddrLower)
+                    .neq("sender_address", userAddrLower)
+                    .order("created_at", { ascending: false });
+                
+                if (msgError) {
+                    console.error("[Waku] Error loading unread messages:", msgError);
+                    return;
+                }
+                
+                if (!unreadMessages || unreadMessages.length === 0) {
+                    console.log("[Waku] No unread messages found");
+                    return;
+                }
+                
+                // Get read receipts for this user
+                const { data: readReceipts, error: receiptError } = await client
+                    .from("shout_read_receipts")
+                    .select("message_id")
+                    .eq("reader_address", userAddrLower);
+                
+                if (receiptError) {
+                    console.error("[Waku] Error loading read receipts:", receiptError);
+                }
+                
+                const readMessageIds = new Set(
+                    (readReceipts || []).map((r: { message_id: string }) => r.message_id)
+                );
+                
+                // Count unread messages per sender
+                const counts: Record<string, number> = {};
+                for (const msg of unreadMessages) {
+                    if (!readMessageIds.has(msg.message_id)) {
+                        const senderLower = msg.sender_address.toLowerCase();
+                        counts[senderLower] = (counts[senderLower] || 0) + 1;
+                    }
+                }
+                
+                console.log("[Waku] Initial unread counts:", counts);
+                
+                if (Object.keys(counts).length > 0) {
+                    setUnreadCounts(counts);
+                }
+            } catch (err) {
+                console.error("[Waku] Error loading initial unread counts:", err);
+            }
+        };
+        
+        loadInitialUnreadCounts();
+    }, [isInitialized, userAddress]);
+
     // Global Supabase realtime subscription for new messages
     // This ensures we catch ALL incoming messages, even when no chat is open
     useEffect(() => {

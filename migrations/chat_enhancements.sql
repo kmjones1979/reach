@@ -77,6 +77,21 @@ BEGIN
     END IF;
 END $$;
 
+-- Enable realtime for messages (IMPORTANT for unread notifications!)
+DO $$
+BEGIN
+    -- Check if table is already in publication
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'shout_messages'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE shout_messages;
+    END IF;
+EXCEPTION WHEN OTHERS THEN
+    -- Table might already be in publication
+    NULL;
+END $$;
+
 -- 5. Muted Conversations Table
 CREATE TABLE IF NOT EXISTS shout_muted_conversations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
