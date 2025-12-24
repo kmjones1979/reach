@@ -254,6 +254,27 @@ export function useHuddle01Call(userAddress: string | null) {
                 return false;
             }
 
+            // Clean up any existing client from a previous call
+            if (clientRef.current) {
+                console.log("[Huddle01] Cleaning up existing client before new call...");
+                try {
+                    await clientRef.current.leaveRoom();
+                } catch (e) {
+                    // Ignore - might already be disconnected
+                }
+                clientRef.current = null;
+            }
+            
+            // Also clean up any lingering audio elements
+            if (remoteAudioRef.current) {
+                remoteAudioRef.current.srcObject = null;
+                remoteAudioRef.current.remove();
+                remoteAudioRef.current = null;
+            }
+            
+            // Clear pending track
+            pendingRemoteVideoTrackRef.current = null;
+
             setState((prev) => ({
                 ...prev,
                 callState: "joining",
@@ -266,7 +287,7 @@ export function useHuddle01Call(userAddress: string | null) {
                 // Use the channel name directly as the room ID
                 // The room should already be created by the caller
                 const roomId = channelName;
-                console.log("[Huddle01] Joining room:", roomId);
+                console.log("[Huddle01] Joining room:", roomId, "- clientRef was:", clientRef.current ? "NOT null (cleaned up)" : "null");
 
                 // Get access token with timeout
                 const tokenPromise = getHuddle01Token(roomId, userAddress);
@@ -1629,12 +1650,17 @@ export function useHuddle01Call(userAddress: string | null) {
                 } catch (leaveError) {
                     // Ignore errors when leaving - the socket might already be closed
                     // This is expected when the remote party ends the call first
+                    console.log("[Huddle01] Leave room error (expected):", leaveError);
                 }
-                clientRef.current = null;
             }
         } catch (error) {
-            // Ignore all errors during cleanup
+            console.log("[Huddle01] Cleanup error:", error);
         } finally {
+            // ALWAYS null the client ref to ensure fresh instance on next call
+            clientRef.current = null;
+            
+            // Reset pending track ref
+            pendingRemoteVideoTrackRef.current = null;
             // Clean up media elements and stop any remaining tracks
             if (localVideoRef.current) {
                 // Stop tracks from video elements
