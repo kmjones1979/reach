@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { createPublicClient, http, isAddress, type Address, fallback } from "viem";
 import { mainnet } from "viem/chains";
 import { normalize } from "viem/ens";
@@ -23,19 +23,92 @@ export type ENSResolution = {
   avatar: string | null;
 };
 
-// Cache for ENS lookups
-const ensCache = new Map<string, ENSResolution>();
+// Cache TTL: 24 hours (ENS names rarely change)
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const ENS_CACHE_KEY = "spritz_ens_cache";
+
+type CachedENSEntry = ENSResolution & { timestamp: number };
+
+// In-memory cache for fast access during session
+const ensCache = new Map<string, CachedENSEntry>();
+
+// Load cache from localStorage on startup
+function loadCacheFromStorage(): void {
+  if (typeof window === "undefined") return;
+  
+  try {
+    const stored = localStorage.getItem(ENS_CACHE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Record<string, CachedENSEntry>;
+      const now = Date.now();
+      
+      // Load non-expired entries
+      for (const [key, entry] of Object.entries(parsed)) {
+        if (now - entry.timestamp < CACHE_TTL_MS) {
+          ensCache.set(key, entry);
+        }
+      }
+      
+      console.log(`[ENS] Loaded ${ensCache.size} cached entries from localStorage`);
+    }
+  } catch (err) {
+    console.warn("[ENS] Failed to load cache from localStorage:", err);
+  }
+}
+
+// Save cache to localStorage (debounced)
+let saveTimeout: NodeJS.Timeout | null = null;
+function saveCacheToStorage(): void {
+  if (typeof window === "undefined") return;
+  
+  // Debounce saves
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    try {
+      const cacheObj: Record<string, CachedENSEntry> = {};
+      ensCache.forEach((value, key) => {
+        cacheObj[key] = value;
+      });
+      localStorage.setItem(ENS_CACHE_KEY, JSON.stringify(cacheObj));
+    } catch (err) {
+      console.warn("[ENS] Failed to save cache to localStorage:", err);
+    }
+  }, 1000);
+}
+
+// Initialize cache from localStorage
+let cacheInitialized = false;
+function initCache() {
+  if (!cacheInitialized && typeof window !== "undefined") {
+    loadCacheFromStorage();
+    cacheInitialized = true;
+  }
+}
+
+// Check if cache entry is still valid
+function isCacheValid(entry: CachedENSEntry | undefined): entry is CachedENSEntry {
+  if (!entry) return false;
+  return Date.now() - entry.timestamp < CACHE_TTL_MS;
+}
 
 export function useENS() {
   const [isResolving, setIsResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Initialize cache on first render
+  useEffect(() => {
+    initCache();
+  }, []);
+
   const resolveAddressOrENS = useCallback(
     async (input: string): Promise<ENSResolution | null> => {
-      // Check cache first
+      initCache(); // Ensure cache is loaded
+      
+      // Check cache first (with TTL validation)
       const cacheKey = input.toLowerCase();
-      if (ensCache.has(cacheKey)) {
-        return ensCache.get(cacheKey)!;
+      const cached = ensCache.get(cacheKey);
+      if (isCacheValid(cached)) {
+        return cached;
       }
 
       setIsResolving(true);
@@ -44,8 +117,9 @@ export function useENS() {
       try {
         // Check if input is a Solana address - return it directly (no ENS for Solana)
         if (isSolanaAddress(input)) {
-          const result: ENSResolution = { address: input, ensName: null, avatar: null };
+          const result: CachedENSEntry = { address: input, ensName: null, avatar: null, timestamp: Date.now() };
           ensCache.set(cacheKey, result);
+          saveCacheToStorage();
           return result;
         }
 
@@ -78,8 +152,9 @@ export function useENS() {
             }
           }
 
-          const result: ENSResolution = { address: input, ensName, avatar };
+          const result: CachedENSEntry = { address: input, ensName, avatar, timestamp: Date.now() };
           ensCache.set(cacheKey, result);
+          saveCacheToStorage();
           return result;
         }
 
@@ -106,9 +181,10 @@ export function useENS() {
             // Silent fail
           }
 
-          const result: ENSResolution = { address, ensName: normalizedName, avatar };
+          const result: CachedENSEntry = { address, ensName: normalizedName, avatar, timestamp: Date.now() };
           ensCache.set(cacheKey, result);
           ensCache.set(address.toLowerCase(), result);
+          saveCacheToStorage();
           return result;
         } catch (err) {
           setError("Could not resolve ENS name");
@@ -128,19 +204,26 @@ export function useENS() {
   // Batch resolve - returns partial results even if some fail
   const resolveAddresses = useCallback(
     async (addresses: string[]): Promise<Map<string, ENSResolution>> => {
+      initCache(); // Ensure cache is loaded
       const results = new Map<string, ENSResolution>();
       
       const uncached: string[] = [];
       for (const addr of addresses) {
         const cacheKey = addr.toLowerCase();
-        if (ensCache.has(cacheKey)) {
-          results.set(addr, ensCache.get(cacheKey)!);
+        const cached = ensCache.get(cacheKey);
+        if (isCacheValid(cached)) {
+          results.set(addr, cached);
         } else {
           uncached.push(addr);
         }
       }
 
-      if (uncached.length === 0) return results;
+      if (uncached.length === 0) {
+        console.log(`[ENS] All ${addresses.length} addresses resolved from cache`);
+        return results;
+      }
+      
+      console.log(`[ENS] Resolving ${uncached.length} addresses (${addresses.length - uncached.length} from cache)`);
 
       // Resolve in small batches with error tolerance
       const batchSize = 2;

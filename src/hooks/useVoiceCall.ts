@@ -181,18 +181,35 @@ export function useVoiceCall() {
 
                 // Set up event handlers
                 client.on("user-published", async (user, mediaType) => {
-                    await client.subscribe(user, mediaType);
+                    console.log(`[Agora] User ${user.uid} published ${mediaType}`);
+                    
+                    try {
+                        await client.subscribe(user, mediaType);
+                        console.log(`[Agora] Successfully subscribed to ${mediaType} from user ${user.uid}`);
+                    } catch (subErr) {
+                        console.error(`[Agora] Failed to subscribe to ${mediaType}:`, subErr);
+                        return;
+                    }
 
                     if (mediaType === "audio") {
                         const remoteAudioTrack = user.audioTrack;
+                        console.log("[Agora] Remote audio track:", remoteAudioTrack ? "exists" : "null");
                         remoteAudioTrackRef.current = remoteAudioTrack || null;
-                        remoteAudioTrack?.play();
+                        if (remoteAudioTrack) {
+                            try {
+                                remoteAudioTrack.play();
+                                console.log("[Agora] Remote audio playing");
+                            } catch (playErr) {
+                                console.error("[Agora] Failed to play remote audio:", playErr);
+                            }
+                        }
                         setState((prev) => ({ ...prev, isRemoteMuted: false }));
                     }
 
                     if (mediaType === "video") {
                         console.log("[Video] Remote video track received");
                         const remoteVideoTrack = user.videoTrack;
+                        console.log("[Video] Remote video track:", remoteVideoTrack ? "exists" : "null");
                         remoteVideoTrackRef.current = remoteVideoTrack || null;
                         // Switch to video layout when remote video arrives
                         setState((prev) => ({
@@ -273,21 +290,30 @@ export function useVoiceCall() {
                 await client.join(agoraAppId, channelName, token, finalUid);
 
                 // Create and publish local audio track
+                console.log("[Agora] Creating microphone audio track...");
                 const localAudioTrack =
                     await AgoraRTC.createMicrophoneAudioTrack();
+                console.log("[Agora] Audio track created:", localAudioTrack ? "success" : "failed");
                 localAudioTrackRef.current = localAudioTrack;
                 await client.publish([localAudioTrack]);
+                console.log("[Agora] Audio track published");
 
                 // Create and publish video track if video call
                 if (withVideo) {
+                    console.log("[Agora] Creating camera video track...");
                     const localVideoTrack =
                         await AgoraRTC.createCameraVideoTrack();
+                    console.log("[Agora] Video track created:", localVideoTrack ? "success" : "failed");
                     localVideoTrackRef.current = localVideoTrack;
                     await client.publish([localVideoTrack]);
+                    console.log("[Agora] Video track published");
 
                     // Play local video
                     if (localVideoRef.current) {
                         localVideoTrack.play(localVideoRef.current);
+                        console.log("[Agora] Local video playing in container");
+                    } else {
+                        console.warn("[Agora] No local video container available");
                     }
                 }
 

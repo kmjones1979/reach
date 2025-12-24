@@ -111,6 +111,73 @@ export function useHuddle01Call(userAddress: string | null) {
     // Guard against processing streams after leaving call
     const isLeavingRef = useRef<boolean>(false);
 
+    // Track video elements per peer for group calls (to avoid overwriting)
+    const peerVideoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
+    
+    // Helper to add/update remote video for a specific peer (supports multiple peers)
+    const addRemoteVideoForPeer = useCallback((peerId: string, track: MediaStreamTrack) => {
+        if (!remoteVideoRef.current) {
+            console.log(`[Huddle01] No remote video container, storing pending track for ${peerId}`);
+            pendingRemoteVideoTrackRef.current = track;
+            return;
+        }
+
+        // Check if we already have a video element for this peer
+        let videoEl = peerVideoElementsRef.current.get(peerId);
+        
+        if (videoEl) {
+            // Update existing element's stream
+            console.log(`[Huddle01] Updating existing video element for peer ${peerId}`);
+            const stream = new MediaStream([track]);
+            videoEl.srcObject = stream;
+            videoEl.play().catch((e) => console.warn("[Huddle01] Video play failed:", e));
+        } else {
+            // Create new video element for this peer
+            console.log(`[Huddle01] Creating new video element for peer ${peerId}`);
+            const stream = new MediaStream([track]);
+            videoEl = document.createElement("video");
+            videoEl.srcObject = stream;
+            videoEl.autoplay = true;
+            videoEl.playsInline = true;
+            videoEl.setAttribute("webkit-playsinline", "true");
+            videoEl.muted = false;
+            videoEl.dataset.peerId = peerId; // Track which peer this belongs to
+            videoEl.style.width = "100%";
+            videoEl.style.height = "100%";
+            videoEl.style.objectFit = "cover";
+            videoEl.style.borderRadius = "12px";
+            
+            // For group calls, add as additional element (don't clear others)
+            remoteVideoRef.current.appendChild(videoEl);
+            peerVideoElementsRef.current.set(peerId, videoEl);
+            
+            videoEl.play().catch((e) => console.warn("[Huddle01] Video play failed:", e));
+            console.log(`[Huddle01] Remote video element created for peer ${peerId}`);
+        }
+        
+        setState((prev) => ({ ...prev, isRemoteVideoOff: false }));
+    }, []);
+
+    // Helper to remove video element for a peer
+    const removeRemoteVideoForPeer = useCallback((peerId: string) => {
+        const videoEl = peerVideoElementsRef.current.get(peerId);
+        if (videoEl) {
+            const stream = videoEl.srcObject as MediaStream;
+            if (stream) {
+                stream.getTracks().forEach((t) => t.stop());
+            }
+            videoEl.srcObject = null;
+            videoEl.remove();
+            peerVideoElementsRef.current.delete(peerId);
+            console.log(`[Huddle01] Removed video element for peer ${peerId}`);
+        }
+        
+        // Update state if no more remote videos
+        if (peerVideoElementsRef.current.size === 0) {
+            setState((prev) => ({ ...prev, isRemoteVideoOff: true }));
+        }
+    }, []);
+
     // Load Huddle01 SDK dynamically
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -133,7 +200,7 @@ export function useHuddle01Call(userAddress: string | null) {
             videoEl.style.height = "100%";
             videoEl.style.objectFit = "cover";
             videoEl.style.borderRadius = "12px";
-            remoteVideoRef.current.innerHTML = "";
+            // Don't clear innerHTML - preserve other peer videos in group calls
             remoteVideoRef.current.appendChild(videoEl);
             pendingRemoteVideoTrackRef.current = null;
             console.log(
@@ -424,6 +491,8 @@ export function useHuddle01Call(userAddress: string | null) {
                     video.srcObject = null;
                 });
                 remoteVideoRef.current.innerHTML = "";
+                // Clear the peer video elements map
+                peerVideoElementsRef.current.clear();
                 console.log("[Huddle01] Cleared remote video elements");
             }
 
@@ -1346,18 +1415,33 @@ export function useHuddle01Call(userAddress: string | null) {
 
                 room.on("peer-left", (peer) => {
                     console.log("[Huddle01] Peer left:", peer);
-                    // Clean up remote media
-                    if (remoteVideoRef.current)
-                        remoteVideoRef.current.innerHTML = "";
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const peerData = peer as any;
+                    const peerId = peerData?.peerId || peerData?.id;
+                    
+                    // Remove only this peer's video (for group call support)
+                    if (peerId) {
+                        removeRemoteVideoForPeer(peerId);
+                    } else {
+                        // Fallback: clear all if we can't identify the peer
+                        if (remoteVideoRef.current)
+                            remoteVideoRef.current.innerHTML = "";
+                        peerVideoElementsRef.current.clear();
+                    }
+                    
                     if (remoteAudioRef.current) {
                         remoteAudioRef.current.srcObject = null;
                         remoteAudioRef.current = null;
                     }
-                    setState((prev) => ({
-                        ...prev,
-                        isRemoteVideoOff: true,
-                        isRemoteMuted: true,
-                    }));
+                    
+                    // Only mark as no remote video if no peers left
+                    if (peerVideoElementsRef.current.size === 0) {
+                        setState((prev) => ({
+                            ...prev,
+                            isRemoteVideoOff: true,
+                            isRemoteMuted: true,
+                        }));
+                    }
                 });
 
                 // Listen for local track production - SDK provides Producer object
@@ -1893,7 +1977,7 @@ export function useHuddle01Call(userAddress: string | null) {
                                     videoEl.style.height = "100%";
                                     videoEl.style.objectFit = "cover";
                                     videoEl.style.borderRadius = "12px";
-                                    remoteVideoRef.current.innerHTML = "";
+                                    // Don't clear innerHTML - preserve other peer videos in group calls
                                     remoteVideoRef.current.appendChild(videoEl);
                                     // iOS requires explicit play() call
                                     videoEl.play().catch((e) => {
@@ -3159,4 +3243,5 @@ export function useHuddle01Call(userAddress: string | null) {
         isConfigured: isHuddle01Configured,
     };
 }
+
 

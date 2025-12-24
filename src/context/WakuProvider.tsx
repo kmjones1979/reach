@@ -1239,16 +1239,21 @@ export function WakuProvider({
                     (readReceipts || []).map((r: { message_id: string }) => r.message_id)
                 );
                 
-                // Count unread messages per sender
+                // Count unread messages per sender (skip if chat is already open)
                 const counts: Record<string, number> = {};
+                const activePeer = activeChatPeerRef.current;
+                
                 for (const msg of unreadMessages) {
                     if (!readMessageIds.has(msg.message_id)) {
                         const senderLower = msg.sender_address.toLowerCase();
-                        counts[senderLower] = (counts[senderLower] || 0) + 1;
+                        // Skip counting for the currently open chat
+                        if (senderLower !== activePeer) {
+                            counts[senderLower] = (counts[senderLower] || 0) + 1;
+                        }
                     }
                 }
                 
-                console.log("[Waku] Initial unread counts:", counts);
+                console.log("[Waku] Initial unread counts:", counts, "(active peer:", activePeer, ")");
                 
                 if (Object.keys(counts).length > 0) {
                     setUnreadCounts(counts);

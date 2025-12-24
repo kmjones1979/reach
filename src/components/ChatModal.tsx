@@ -131,7 +131,11 @@ export function ChatModal({
     useEffect(() => {
         if (isOpen) {
             // Set this chat as active to prevent unread count increments
+            // This also calls markAsRead internally
             setActiveChatPeer(peerAddress);
+            // Also explicitly mark as read to clear any existing unread count
+            markAsRead(peerAddress);
+            console.log("[Chat] Opened chat with", peerAddress, "- marking as read");
         } else {
             setMessages([]);
             setChatError(null);
@@ -142,7 +146,7 @@ export function ChatModal({
             // Clear active chat peer
             setActiveChatPeer(null);
         }
-    }, [isOpen, stopTyping, setActiveChatPeer, peerAddress]);
+    }, [isOpen, stopTyping, setActiveChatPeer, markAsRead, peerAddress]);
 
     // Load messages and start streaming when initialized
     useEffect(() => {
