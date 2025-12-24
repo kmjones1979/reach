@@ -1270,15 +1270,16 @@ export function useHuddle01Call(userAddress: string | null) {
                 await Promise.race([joinPromise, joinTimeoutPromise]);
                 console.log("[Huddle01] Join room completed");
 
-                // On mobile, wait a moment for the room to fully initialize
+                // On mobile, wait longer for the room to fully initialize
+                // This helps ensure the caller's streams are ready before the callee joins
                 const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(
                     navigator.userAgent
                 );
                 if (isMobileDevice) {
                     console.log(
-                        "[Huddle01] Mobile detected, waiting 500ms before enabling media..."
+                        "[Huddle01] Mobile detected, waiting 1000ms before enabling media..."
                     );
-                    await new Promise((resolve) => setTimeout(resolve, 500));
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
                 }
 
                 // Enable audio (using type assertion for SDK compatibility)
@@ -1291,42 +1292,54 @@ export function useHuddle01Call(userAddress: string | null) {
                     stopScreenShare: () => Promise<void>;
                 };
 
-                try {
-                    console.log("[Huddle01] Enabling audio...");
-                    await localPeer.enableAudio();
-                    setState((prev) => ({ ...prev, isMuted: false }));
-                    console.log("[Huddle01] Audio enabled successfully");
-                } catch (audioError) {
-                    console.error(
-                        "[Huddle01] FAILED to enable audio:",
-                        audioError,
-                        "Error details:",
-                        JSON.stringify(
-                            audioError,
-                            Object.getOwnPropertyNames(audioError)
-                        )
-                    );
-                    // On mobile, audio failure is critical
+                // Enable audio with retry on mobile
+                let audioEnabled = false;
+                for (let attempt = 1; attempt <= (isMobileDevice ? 3 : 1); attempt++) {
+                    try {
+                        console.log(`[Huddle01] Enabling audio (attempt ${attempt})...`);
+                        await localPeer.enableAudio();
+                        setState((prev) => ({ ...prev, isMuted: false }));
+                        console.log("[Huddle01] Audio enabled successfully");
+                        audioEnabled = true;
+                        break;
+                    } catch (audioError) {
+                        console.error(
+                            `[Huddle01] FAILED to enable audio (attempt ${attempt}):`,
+                            audioError
+                        );
+                        if (attempt < 3 && isMobileDevice) {
+                            console.log("[Huddle01] Retrying audio in 500ms...");
+                            await new Promise((resolve) => setTimeout(resolve, 500));
+                        }
+                    }
+                }
+                if (!audioEnabled) {
                     setState((prev) => ({ ...prev, isMuted: true }));
                 }
 
-                // Enable video if requested
+                // Enable video if requested, with retry on mobile
                 if (withVideo) {
-                    try {
-                        console.log("[Huddle01] Enabling video...");
-                        await localPeer.enableVideo();
-                        setState((prev) => ({ ...prev, isVideoOff: false }));
-                        console.log("[Huddle01] Video enabled successfully");
-                    } catch (videoError) {
-                        console.error(
-                            "[Huddle01] FAILED to enable video:",
-                            videoError,
-                            "Error details:",
-                            JSON.stringify(
-                                videoError,
-                                Object.getOwnPropertyNames(videoError)
-                            )
-                        );
+                    let videoEnabled = false;
+                    for (let attempt = 1; attempt <= (isMobileDevice ? 3 : 1); attempt++) {
+                        try {
+                            console.log(`[Huddle01] Enabling video (attempt ${attempt})...`);
+                            await localPeer.enableVideo();
+                            setState((prev) => ({ ...prev, isVideoOff: false }));
+                            console.log("[Huddle01] Video enabled successfully");
+                            videoEnabled = true;
+                            break;
+                        } catch (videoError) {
+                            console.error(
+                                `[Huddle01] FAILED to enable video (attempt ${attempt}):`,
+                                videoError
+                            );
+                            if (attempt < 3 && isMobileDevice) {
+                                console.log("[Huddle01] Retrying video in 500ms...");
+                                await new Promise((resolve) => setTimeout(resolve, 500));
+                            }
+                        }
+                    }
+                    if (!videoEnabled) {
                         setState((prev) => ({ ...prev, isVideoOff: true }));
                     }
                 }
