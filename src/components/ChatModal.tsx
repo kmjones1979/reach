@@ -86,7 +86,7 @@ export function ChatModal({
         userAddress,
         conversationId
     );
-    const { markMessagesRead, getMessageStatus } = useReadReceipts(
+    const { markMessagesRead, getMessageStatus, fetchReadReceipts } = useReadReceipts(
         userAddress,
         conversationId
     );
@@ -215,8 +215,16 @@ export function ChatModal({
 
                     setMessages(formattedMessages);
 
-                    // Mark all loaded messages as read in the database
+                    // Fetch read receipts for messages we sent
                     if (formattedMessages.length > 0) {
+                        const myMessageIds = formattedMessages
+                            .filter((m: Message) => m.senderAddress.toLowerCase() === userAddress.toLowerCase())
+                            .map((m: Message) => m.id);
+                        if (myMessageIds.length > 0) {
+                            fetchReadReceipts(myMessageIds);
+                        }
+                        
+                        // Mark all loaded messages as read in the database
                         markMessagesRead(
                             formattedMessages.map((m: Message) => m.id)
                         );
@@ -381,6 +389,14 @@ export function ChatModal({
                         }
                         return prev;
                     });
+                    
+                    // Also refresh read receipts for our sent messages
+                    const myMsgIds = formattedMessages
+                        .filter((m) => m.senderAddress.toLowerCase() === userAddress.toLowerCase())
+                        .map((m) => m.id);
+                    if (myMsgIds.length > 0) {
+                        fetchReadReceipts(myMsgIds);
+                    }
                 }
             } catch (err) {
                 console.log("[Chat] Polling error:", err);
@@ -388,7 +404,7 @@ export function ChatModal({
         }, 3000); // Poll every 3 seconds
 
         return () => clearInterval(pollInterval);
-    }, [isOpen, isInitialized, chatState, peerAddress, getMessages]);
+    }, [isOpen, isInitialized, chatState, peerAddress, getMessages, userAddress, fetchReadReceipts]);
 
     const handleSend = useCallback(async () => {
         if (!newMessage.trim()) return;
