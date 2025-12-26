@@ -517,5 +517,128 @@ export function useDiscoverAgents(userAddress: string | null) {
     };
 }
 
+// Hook for managing favorite agents
+export type FavoriteAgent = {
+    id: string;
+    created_at: string;
+    agent: DiscoveredAgent;
+};
+
+export function useFavoriteAgents(userAddress: string | null) {
+    const [favorites, setFavorites] = useState<FavoriteAgent[]>([]);
+    const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchFavorites = useCallback(async () => {
+        if (!userAddress) {
+            setFavorites([]);
+            setFavoriteIds(new Set());
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const res = await fetch(`/api/agents/favorites?userAddress=${encodeURIComponent(userAddress)}`);
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to fetch favorites");
+            }
+
+            setFavorites(data.favorites || []);
+            setFavoriteIds(new Set((data.favorites || []).map((f: FavoriteAgent) => f.agent.id)));
+        } catch (err) {
+            console.error("[useFavoriteAgents] Error:", err);
+            setError(err instanceof Error ? err.message : "Failed to fetch favorites");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [userAddress]);
+
+    const addFavorite = useCallback(async (agentId: string): Promise<boolean> => {
+        if (!userAddress) return false;
+
+        try {
+            const res = await fetch("/api/agents/favorites", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userAddress, agentId }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to add favorite");
+            }
+
+            // Update local state
+            setFavoriteIds(prev => new Set([...prev, agentId]));
+            await fetchFavorites();
+            return true;
+        } catch (err) {
+            console.error("[useFavoriteAgents] Error:", err);
+            throw err;
+        }
+    }, [userAddress, fetchFavorites]);
+
+    const removeFavorite = useCallback(async (agentId: string): Promise<boolean> => {
+        if (!userAddress) return false;
+
+        try {
+            const res = await fetch(
+                `/api/agents/favorites?userAddress=${encodeURIComponent(userAddress)}&agentId=${encodeURIComponent(agentId)}`,
+                { method: "DELETE" }
+            );
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Failed to remove favorite");
+            }
+
+            // Update local state
+            setFavoriteIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(agentId);
+                return newSet;
+            });
+            setFavorites(prev => prev.filter(f => f.agent.id !== agentId));
+            return true;
+        } catch (err) {
+            console.error("[useFavoriteAgents] Error:", err);
+            throw err;
+        }
+    }, [userAddress]);
+
+    const isFavorite = useCallback((agentId: string) => {
+        return favoriteIds.has(agentId);
+    }, [favoriteIds]);
+
+    const toggleFavorite = useCallback(async (agentId: string): Promise<boolean> => {
+        if (isFavorite(agentId)) {
+            return removeFavorite(agentId);
+        } else {
+            return addFavorite(agentId);
+        }
+    }, [isFavorite, addFavorite, removeFavorite]);
+
+    useEffect(() => {
+        fetchFavorites();
+    }, [fetchFavorites]);
+
+    return {
+        favorites,
+        isLoading,
+        error,
+        isFavorite,
+        addFavorite,
+        removeFavorite,
+        toggleFavorite,
+        refresh: fetchFavorites,
+    };
+}
+
 export default useAgents;
 

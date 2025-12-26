@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useAgents, Agent, DiscoveredAgent } from "@/hooks/useAgents";
+import { useAgents, useFavoriteAgents, Agent, DiscoveredAgent } from "@/hooks/useAgents";
 import { CreateAgentModal } from "./CreateAgentModal";
 import { AgentChatModal } from "./AgentChatModal";
 import { EditAgentModal } from "./EditAgentModal";
@@ -15,6 +15,7 @@ interface AgentsSectionProps {
 
 export function AgentsSection({ userAddress }: AgentsSectionProps) {
     const { agents, isLoading, error, createAgent, updateAgent, deleteAgent } = useAgents(userAddress);
+    const { favorites, removeFavorite } = useFavoriteAgents(userAddress);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isKnowledgeModalOpen, setIsKnowledgeModalOpen] = useState(false);
@@ -57,6 +58,18 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
     const handleSelectDiscoveredAgent = (agent: DiscoveredAgent) => {
         setSelectedDiscoveredAgent(agent);
         setIsExploreModalOpen(false);
+        setIsChatOpen(true);
+    };
+
+    const handleRemoveFavorite = async (e: React.MouseEvent, agentId: string) => {
+        e.stopPropagation();
+        if (confirm("Remove from favorites?")) {
+            await removeFavorite(agentId);
+        }
+    };
+
+    const handleOpenFavoriteChat = (agent: DiscoveredAgent) => {
+        setSelectedDiscoveredAgent(agent);
         setIsChatOpen(true);
     };
 
@@ -174,6 +187,7 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                             </motion.div>
                         ) : (
                             <div className="space-y-2">
+                                {/* User's own agents */}
                                 {agents.map((agent) => (
                                     <motion.div
                                         key={agent.id}
@@ -258,6 +272,53 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                         </div>
                                     </motion.div>
                                 ))}
+
+                                {/* Favorite agents from others */}
+                                {favorites.length > 0 && (
+                                    <>
+                                        <div className="flex items-center gap-2 mt-4 mb-2">
+                                            <span className="text-yellow-400">⭐</span>
+                                            <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Favorites</span>
+                                        </div>
+                                        {favorites.map((fav) => (
+                                            <motion.div
+                                                key={fav.id}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="group p-3 bg-zinc-800/30 hover:bg-zinc-800/50 border border-yellow-500/20 hover:border-yellow-500/40 rounded-xl transition-all cursor-pointer"
+                                                onClick={() => handleOpenFavoriteChat(fav.agent)}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center text-xl shrink-0">
+                                                        {fav.agent.avatar_emoji}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="font-medium text-white truncate">{fav.agent.name}</h3>
+                                                            {fav.agent.isFriendsAgent && (
+                                                                <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">
+                                                                    👥
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-zinc-500 truncate">
+                                                            by {fav.agent.owner?.username ? `@${fav.agent.owner.username}` : fav.agent.owner_address.slice(0, 10) + "..."}
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => handleRemoveFavorite(e, fav.agent.id)}
+                                                        className="p-2 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded-lg transition-colors"
+                                                        title="Remove from favorites"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </>
+                                )}
                             </div>
                         )}
                     </motion.div>
