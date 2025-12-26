@@ -764,7 +764,7 @@ export default function UsersPage() {
             {/* Edit User Modal */}
             {editingUser && (
                 <div 
-                    className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto"
+                    className="fixed inset-0 bg-black/70 flex items-start justify-center p-4 z-50 overflow-y-auto"
                     onClick={(e) => {
                         // Close when clicking the backdrop (not the modal content)
                         if (e.target === e.currentTarget) {
@@ -782,7 +782,7 @@ export default function UsersPage() {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="bg-zinc-900 rounded-2xl p-6 max-w-2xl w-full border border-zinc-800 my-8"
+                        className="bg-zinc-900 rounded-2xl p-6 max-w-2xl w-full border border-zinc-800 my-8 max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-start justify-between mb-6">
