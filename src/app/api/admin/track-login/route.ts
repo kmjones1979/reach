@@ -60,6 +60,15 @@ export async function POST(request: NextRequest) {
                 console.error("[Login] Error updating user:", error);
             }
 
+            // Ensure user is in Alpha channel (in case they joined before Alpha existed)
+            try {
+                await supabase.rpc("join_alpha_channel", {
+                    p_user_address: normalizedAddress,
+                });
+            } catch {
+                // Ignore errors - user might already be a member
+            }
+
             return NextResponse.json({ 
                 success: true, 
                 isNewUser: false,
@@ -131,6 +140,15 @@ export async function POST(request: NextRequest) {
             if (error) {
                 console.error("[Login] Error creating user:", error);
                 return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+            }
+
+            // Auto-join new user to Alpha channel (muted by default)
+            try {
+                await supabase.rpc("join_alpha_channel", {
+                    p_user_address: normalizedAddress,
+                });
+            } catch (err) {
+                console.error("[Login] Failed to join Alpha channel:", err);
             }
 
             return NextResponse.json({ 
