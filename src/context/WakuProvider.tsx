@@ -2130,9 +2130,13 @@ export function WakuProvider({
 
                 // Unsubscribe from the group topic
                 const contentTopic = getGroupContentTopic(groupId);
-                const subscription = subscriptionsRef.current.get(contentTopic);
-                if (subscription) {
-                    await subscription.unsubscribe([contentTopic]);
+                const decoder = subscriptionsRef.current.get(contentTopic);
+                if (decoder && nodeRef.current) {
+                    try {
+                        await nodeRef.current.filter.unsubscribe(decoder);
+                    } catch (unsubErr) {
+                        console.warn("[Waku] Error unsubscribing from group:", unsubErr);
+                    }
                     subscriptionsRef.current.delete(contentTopic);
                 }
 
