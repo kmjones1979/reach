@@ -27,20 +27,26 @@ export async function GET(request: NextRequest) {
 
         const normalizedAddress = userAddress.toLowerCase();
 
-        // Get user's friends list
-        const { data: friendships } = await supabase
-            .from("shout_friendships")
-            .select("user1_address, user2_address")
-            .or(`user1_address.eq.${normalizedAddress},user2_address.eq.${normalizedAddress}`);
+        // Get user's friends list (friendships are stored in both directions)
+        const { data: friendships, error: friendError } = await supabase
+            .from("shout_friends")
+            .select("user_address, friend_address")
+            .or(`user_address.eq.${normalizedAddress},friend_address.eq.${normalizedAddress}`);
+
+        if (friendError) {
+            console.error("[Discover] Error fetching friendships:", friendError);
+        }
 
         const friendAddresses = new Set<string>();
         (friendships || []).forEach(f => {
-            if (f.user1_address === normalizedAddress) {
-                friendAddresses.add(f.user2_address);
-            } else {
-                friendAddresses.add(f.user1_address);
-            }
+            // Add both addresses, then remove self
+            friendAddresses.add(f.user_address.toLowerCase());
+            friendAddresses.add(f.friend_address.toLowerCase());
         });
+        friendAddresses.delete(normalizedAddress); // Remove self
+        
+        console.log("[Discover] User:", normalizedAddress);
+        console.log("[Discover] Friends found:", Array.from(friendAddresses));
 
         // Build query based on filter
         let query = supabase
@@ -65,11 +71,13 @@ export async function GET(request: NextRequest) {
         } else if (filter === "friends") {
             // Only friends' agents that are visible to friends
             if (friendAddresses.size > 0) {
+                const friendList = Array.from(friendAddresses);
+                console.log("[Discover] Looking for agents from friends:", friendList);
                 query = query
-                    .in("owner_address", Array.from(friendAddresses))
+                    .in("owner_address", friendList)
                     .in("visibility", ["friends", "public"]);
             } else {
-                // No friends, return empty
+                console.log("[Discover] No friends found, returning empty");
                 return NextResponse.json({ agents: [], total: 0 });
             }
         } else {
@@ -92,8 +100,13 @@ export async function GET(request: NextRequest) {
 
         const { data: agents, error } = await query;
 
+        console.log("[Discover] Query result - agents found:", agents?.length || 0);
+        if (agents && agents.length > 0) {
+            console.log("[Discover] First agent:", agents[0]);
+        }
+
         if (error) {
-            console.error("[Discover] Error:", error);
+            console.error("[Discover] Query error:", error);
             return NextResponse.json({ error: "Failed to fetch agents" }, { status: 500 });
         }
 
