@@ -1562,6 +1562,7 @@ export function WakuProvider({
                         }
 
                         // Merge Supabase groups into our map
+                        let hasUpdates = false;
                         for (const dbGroup of dbGroups) {
                             if (!groupsMap.has(dbGroup.id)) {
                                 const group: StoredGroup = {
@@ -1573,23 +1574,25 @@ export function WakuProvider({
                                     symmetricKey: dbGroup.symmetric_key,
                                 };
                                 groupsMap.set(dbGroup.id, group);
-                                
-                                console.log("[Waku] Found group from Supabase:", dbGroup.name);
+                                hasUpdates = true;
+                                console.log("[Waku] Found group from Supabase:", dbGroup.name, "emoji:", dbGroup.emoji);
                             } else {
                                 // Update emoji if it exists in Supabase but not locally
                                 const existingGroup = groupsMap.get(dbGroup.id);
-                                if (existingGroup && !existingGroup.emoji && dbGroup.emoji) {
+                                if (existingGroup && dbGroup.emoji && existingGroup.emoji !== dbGroup.emoji) {
                                     existingGroup.emoji = dbGroup.emoji;
                                     groupsMap.set(dbGroup.id, existingGroup);
+                                    hasUpdates = true;
+                                    console.log("[Waku] Updated emoji for group:", dbGroup.name, "to:", dbGroup.emoji);
                                 }
                             }
                         }
 
-                        // Update localStorage with any new groups from Supabase
-                        const updatedGroups = Array.from(groupsMap.values());
-                        if (updatedGroups.length > storedGroups.length) {
+                        // Update localStorage if there were any changes
+                        if (hasUpdates) {
+                            const updatedGroups = Array.from(groupsMap.values());
                             saveGroups(updatedGroups);
-                            console.log("[Waku] Updated localStorage with Supabase groups");
+                            console.log("[Waku] Saved groups to localStorage with emoji updates");
                         }
                     }
                 }
