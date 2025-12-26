@@ -212,17 +212,17 @@ export default function Home() {
                     className="w-full max-w-md"
                 >
                     <div className="glass-card rounded-3xl p-8 shadow-2xl">
-                        {/* Passkey Section */}
+                        {/* Wallet Section */}
                         <div className="mb-8">
                             <div className="flex items-center gap-2 mb-6">
                                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-700 to-transparent" />
                                 <span className="text-zinc-500 text-sm font-medium uppercase tracking-wider">
-                                    Passkey
+                                    Connect Wallet
                                 </span>
                                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-700 to-transparent" />
                             </div>
 
-                            <PasskeyAuth />
+                            <WalletConnect />
                         </div>
 
                         {/* Divider */}
@@ -232,17 +232,17 @@ export default function Home() {
                             <div className="h-px flex-1 bg-zinc-800" />
                         </div>
 
-                        {/* Wallet Section */}
+                        {/* Passkey Section */}
                         <div>
                             <div className="flex items-center gap-2 mb-6">
                                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-700 to-transparent" />
                                 <span className="text-zinc-500 text-sm font-medium uppercase tracking-wider">
-                                    Wallet
+                                    Passkey Login
                                 </span>
                                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-700 to-transparent" />
                             </div>
 
-                            <WalletConnect />
+                            <PasskeyAuth />
                         </div>
                     </div>
 
