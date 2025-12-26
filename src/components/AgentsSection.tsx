@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useAgents, Agent } from "@/hooks/useAgents";
+import { useAgents, Agent, DiscoveredAgent } from "@/hooks/useAgents";
 import { CreateAgentModal } from "./CreateAgentModal";
 import { AgentChatModal } from "./AgentChatModal";
 import { EditAgentModal } from "./EditAgentModal";
 import { AgentKnowledgeModal } from "./AgentKnowledgeModal";
+import { ExploreAgentsModal } from "./ExploreAgentsModal";
 
 interface AgentsSectionProps {
     userAddress: string;
@@ -17,7 +18,9 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isKnowledgeModalOpen, setIsKnowledgeModalOpen] = useState(false);
+    const [isExploreModalOpen, setIsExploreModalOpen] = useState(false);
     const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+    const [selectedDiscoveredAgent, setSelectedDiscoveredAgent] = useState<DiscoveredAgent | null>(null);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(true);
 
@@ -51,6 +54,12 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
         setIsKnowledgeModalOpen(true);
     };
 
+    const handleSelectDiscoveredAgent = (agent: DiscoveredAgent) => {
+        setSelectedDiscoveredAgent(agent);
+        setIsExploreModalOpen(false);
+        setIsChatOpen(true);
+    };
+
     const handleSaveAgent = async (agentId: string, updates: {
         name?: string;
         personality?: string;
@@ -82,6 +91,20 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Explore Button */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsExploreModalOpen(true);
+                        }}
+                        className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                        title="Explore Agents"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </button>
+                    {/* Create Button */}
                     {agents.length < 5 && (
                         <button
                             onClick={(e) => {
@@ -252,8 +275,9 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                 onClose={() => {
                     setIsChatOpen(false);
                     setSelectedAgent(null);
+                    setSelectedDiscoveredAgent(null);
                 }}
-                agent={selectedAgent}
+                agent={selectedAgent || selectedDiscoveredAgent}
                 userAddress={userAddress}
             />
             <EditAgentModal
@@ -273,6 +297,12 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                 }}
                 agent={selectedAgent}
                 userAddress={userAddress}
+            />
+            <ExploreAgentsModal
+                isOpen={isExploreModalOpen}
+                onClose={() => setIsExploreModalOpen(false)}
+                userAddress={userAddress}
+                onSelectAgent={handleSelectDiscoveredAgent}
             />
         </div>
     );

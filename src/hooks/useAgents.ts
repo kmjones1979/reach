@@ -452,5 +452,70 @@ export function useAgentKnowledge(userAddress: string | null, agentId: string | 
     };
 }
 
+// Hook for discovering public/friends' agents
+export type DiscoveredAgent = Agent & {
+    owner: {
+        username?: string;
+        ensName?: string;
+    };
+    isFriendsAgent: boolean;
+};
+
+export function useDiscoverAgents(userAddress: string | null) {
+    const [agents, setAgents] = useState<DiscoveredAgent[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [filter, setFilter] = useState<"all" | "public" | "friends">("all");
+    const [search, setSearch] = useState("");
+
+    const fetchAgents = useCallback(async () => {
+        if (!userAddress) {
+            setAgents([]);
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const params = new URLSearchParams({
+                userAddress,
+                filter,
+                search,
+                limit: "50",
+            });
+
+            const res = await fetch(`/api/agents/discover?${params}`);
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to discover agents");
+            }
+
+            setAgents(data.agents || []);
+        } catch (err) {
+            console.error("[useDiscoverAgents] Error:", err);
+            setError(err instanceof Error ? err.message : "Failed to discover agents");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [userAddress, filter, search]);
+
+    useEffect(() => {
+        fetchAgents();
+    }, [fetchAgents]);
+
+    return {
+        agents,
+        isLoading,
+        error,
+        filter,
+        setFilter,
+        search,
+        setSearch,
+        refresh: fetchAgents,
+    };
+}
+
 export default useAgents;
 
