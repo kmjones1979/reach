@@ -17,23 +17,23 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-    metadataBase: new URL("https://spritz.chat"),
-    title: "Spritz | Voice Calls for Web3",
+    metadataBase: new URL("https://app.spritz.chat"),
+    title: "Spritz | Censorship-Resistant Chat for Web3",
     description:
-        "Voice calls for Web3. Connect with friends using passkeys or wallets and make voice calls.",
+        "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make voice & video calls, and chat freely.",
     manifest: "/manifest.json",
     openGraph: {
-        title: "Spritz | Voice Calls for Web3",
+        title: "Spritz | Censorship-Resistant Chat for Web3",
         description:
-            "Voice calls for Web3. Connect with friends using passkeys or wallets and make voice calls.",
-        url: "https://spritz.chat",
+            "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make voice & video calls, and chat freely.",
+        url: "https://app.spritz.chat",
         siteName: "Spritz",
         images: [
             {
                 url: "/og-image.png",
                 width: 1200,
                 height: 630,
-                alt: "Spritz - Voice Calls for Web3",
+                alt: "Spritz - Censorship-Resistant Chat for Web3",
             },
         ],
         locale: "en_US",
@@ -41,9 +41,9 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: "summary_large_image",
-        title: "Spritz | Voice Calls for Web3",
+        title: "Spritz | Censorship-Resistant Chat for Web3",
         description:
-            "Voice calls for Web3. Connect with friends using passkeys or wallets and make voice calls.",
+            "The censorship-resistant chat app for Web3. Connect with friends using passkeys or wallets, make voice & video calls, and chat freely.",
         images: ["/og-image.png"],
     },
     appleWebApp: {

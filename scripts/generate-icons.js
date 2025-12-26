@@ -66,10 +66,22 @@ async function generateIcons() {
     .toFile(path.join(outputDir, 'favicon-16x16.png'));
   console.log('  Created: favicon-16x16.png');
 
+  // Generate OG image (1200x630 for social media previews)
+  const ogSvgPath = path.join(__dirname, '../public/og-image.svg');
+  if (fs.existsSync(ogSvgPath)) {
+    const ogSvgBuffer = fs.readFileSync(ogSvgPath);
+    await sharp(ogSvgBuffer)
+      .resize(1200, 630)
+      .png()
+      .toFile(path.join(__dirname, '../public/og-image.png'));
+    console.log('  Created: og-image.png (1200x630)');
+  }
+
   console.log('\nDone! All PWA icons generated.');
 }
 
 generateIcons().catch(console.error);
+
 
 
 
