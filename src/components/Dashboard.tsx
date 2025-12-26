@@ -2777,6 +2777,43 @@ function DashboardContent({
                             )}
                         </div>
 
+                        {/* Daily Bonus Claim Card */}
+                        {dailyBonusAvailable && !dailyBonusClaimed && (
+                            <div className="mx-6 mt-4 mb-2">
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4"
+                                >
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center">
+                                                <span className="text-xl">🎁</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-white font-medium text-sm">Daily Bonus Available!</p>
+                                                <p className="text-amber-400/70 text-xs">+3 points for logging in today</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={handleClaimDailyBonus}
+                                            disabled={isClaimingBonus}
+                                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:shadow-lg hover:shadow-orange-500/25 transition-all disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            {isClaimingBonus ? (
+                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <span>✨</span>
+                                                    Claim
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        )}
+
                         <div className="p-6">
                             <FriendsList
                                 friends={friendsListData}
