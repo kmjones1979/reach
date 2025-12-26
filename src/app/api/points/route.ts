@@ -14,6 +14,7 @@ const POINTS = {
     EMAIL_VERIFIED: 100,
     INVITE_REDEEMED: 100, // per invite
     FIVE_FRIENDS: 50,
+    ENS_PRIMARY: 50,
     USERNAME_CLAIMED: 10,
     SOCIAL_ADDED: 10,
 };
@@ -123,6 +124,11 @@ export async function POST(request: NextRequest) {
                 points = POINTS.SOCIAL_ADDED;
                 reason = "Added social link";
                 claimKey = "social_added";
+                break;
+            case "ens_primary":
+                points = POINTS.ENS_PRIMARY;
+                reason = "Primary ENS name set";
+                claimKey = "ens_primary";
                 break;
             default:
                 return NextResponse.json(

@@ -31,6 +31,7 @@ export const POINT_VALUES = {
     EMAIL_VERIFIED: 100,
     INVITE_REDEEMED: 100,
     FIVE_FRIENDS: 50,
+    ENS_PRIMARY: 50,
     USERNAME_CLAIMED: 10,
     SOCIAL_ADDED: 10,
 } as const;
@@ -40,7 +41,8 @@ export type PointAction =
     | "email_verified"
     | "five_friends"
     | "username_claimed"
-    | "social_added";
+    | "social_added"
+    | "ens_primary";
 
 export function usePoints(walletAddress: string | null) {
     const [state, setState] = useState<PointsState>({

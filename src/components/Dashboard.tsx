@@ -177,8 +177,11 @@ function DashboardContent({
     const { username: reachUsername, claimUsername } = useUsername(userAddress);
 
     // Phone verification hook - works for both EVM and Solana addresses
-    const { phoneNumber: verifiedPhone, isVerified: isPhoneVerified, refresh: refreshPhone } =
-        usePhoneVerification(userAddress);
+    const {
+        phoneNumber: verifiedPhone,
+        isVerified: isPhoneVerified,
+        refresh: refreshPhone,
+    } = usePhoneVerification(userAddress);
 
     // Socials hook
     const {
@@ -231,9 +234,9 @@ function DashboardContent({
     });
 
     // Analytics tracking
-    const { 
-        trackVoiceCall, 
-        trackVideoCall, 
+    const {
+        trackVoiceCall,
+        trackVideoCall,
         syncFriendsCount,
         syncGroupsCount,
         trackFriendAdded,
@@ -244,10 +247,41 @@ function DashboardContent({
     const { isAdmin, isSuperAdmin } = useAdminCheck(userAddress);
 
     // Email verification
-    const { isVerified: isEmailVerified, email: userEmail, refresh: refreshEmail } = useEmailVerification(userAddress);
+    const {
+        isVerified: isEmailVerified,
+        email: userEmail,
+        refresh: refreshEmail,
+    } = useEmailVerification(userAddress);
 
     // Points system
-    const { points: userPoints, checkFriendsMilestone, awardPoints: awardUserPoints, hasClaimed } = usePoints(userAddress);
+    const {
+        points: userPoints,
+        checkFriendsMilestone,
+        awardPoints: awardUserPoints,
+        hasClaimed,
+        refresh: refreshPoints,
+    } = usePoints(userAddress);
+
+    // Retroactively award points for existing username/socials
+    useEffect(() => {
+        // Award points for existing username if not already claimed
+        if (reachUsername && !hasClaimed("username_claimed")) {
+            console.log(
+                "[Points] Awarding retroactive points for existing username"
+            );
+            awardUserPoints("username_claimed");
+        }
+    }, [reachUsername, hasClaimed, awardUserPoints]);
+
+    useEffect(() => {
+        // Award points for existing socials if not already claimed
+        if (socialCount > 0 && !hasClaimed("social_added")) {
+            console.log(
+                "[Points] Awarding retroactive points for existing socials"
+            );
+            awardUserPoints("social_added");
+        }
+    }, [socialCount, hasClaimed, awardUserPoints]);
 
     // User invites
     const { available: availableInvites } = useUserInvites(userAddress);
@@ -288,7 +322,7 @@ function DashboardContent({
     // Presence heartbeat - updates last_seen every 30 seconds
     usePresence(userAddress);
 
-    // Resolve user's ENS
+    // Resolve user's ENS and award points if they have one
     useEffect(() => {
         async function resolveUserENS() {
             const resolved = await resolveAddressOrENS(userAddress);
@@ -297,10 +331,14 @@ function DashboardContent({
                     ensName: resolved.ensName,
                     avatar: resolved.avatar,
                 });
+                // Award points for having a primary ENS name (only once)
+                if (resolved.ensName && !hasClaimed("ens_primary")) {
+                    awardUserPoints("ens_primary");
+                }
             }
         }
         resolveUserENS();
-    }, [userAddress, resolveAddressOrENS]);
+    }, [userAddress, resolveAddressOrENS, hasClaimed, awardUserPoints]);
 
     // Agora (centralized) call hook
     const agoraCall = useVoiceCall();
@@ -310,18 +348,23 @@ function DashboardContent({
 
     // Track which provider is currently being used for the active call
     // null = no call, "agora" = centralized, "huddle01" = decentralized
-    const [currentCallProvider, setCurrentCallProvider] = useState<"agora" | "huddle01" | null>(null);
+    const [currentCallProvider, setCurrentCallProvider] = useState<
+        "agora" | "huddle01" | null
+    >(null);
 
     // Determine which provider to use for UI based on current call
     // When in a call, use the provider that was actually joined
     // When not in a call, default to user's preferred settings
     const useDecentralized =
         userSettings.decentralizedCalls && isHuddle01Configured;
-    const activeCall = currentCallProvider === "agora" 
-        ? agoraCall 
-        : currentCallProvider === "huddle01" 
-            ? huddle01Call 
-            : (useDecentralized ? huddle01Call : agoraCall);
+    const activeCall =
+        currentCallProvider === "agora"
+            ? agoraCall
+            : currentCallProvider === "huddle01"
+            ? huddle01Call
+            : useDecentralized
+            ? huddle01Call
+            : agoraCall;
 
     // Destructure from active provider
     const {
@@ -493,13 +536,13 @@ function DashboardContent({
     const friendsListData: FriendsListFriend[] = useMemo(
         () =>
             friends.map((f) => ({
-        id: f.id,
-        address: f.friend_address as Address,
-        ensName: f.ensName || null,
-        avatar: f.avatar || null,
-        nickname: f.nickname,
-        reachUsername: f.reachUsername || null,
-        addedAt: f.created_at,
+                id: f.id,
+                address: f.friend_address as Address,
+                ensName: f.ensName || null,
+                avatar: f.avatar || null,
+                nickname: f.nickname,
+                reachUsername: f.reachUsername || null,
+                addedAt: f.created_at,
             })),
         [friends]
     );
@@ -688,7 +731,7 @@ function DashboardContent({
             // Group calls are typically video calls
             trackVideoCall(callDurationMinutes);
         }
-        
+
         if (userSettings.soundEnabled) {
             notifyCallEnded();
         }
@@ -901,7 +944,7 @@ function DashboardContent({
         let channelName: string;
         const useDecentralizedForCall =
             userSettings.decentralizedCalls && isHuddle01Configured;
-        
+
         // Set the provider BEFORE making the call so UI uses correct state
         const provider = useDecentralizedForCall ? "huddle01" : "agora";
         setCurrentCallProvider(provider);
@@ -974,20 +1017,29 @@ function DashboardContent({
         // Join the call using the selected provider
         let success: boolean;
         if (provider === "huddle01") {
-            success = await huddle01Call.joinCall(channelName, undefined, withVideo);
-            
+            success = await huddle01Call.joinCall(
+                channelName,
+                undefined,
+                withVideo
+            );
+
             // If Huddle01 fails, fall back to Agora
             if (!success && isAgoraConfigured) {
-                console.log("[Dashboard] Huddle01 failed, falling back to Agora...");
+                console.log(
+                    "[Dashboard] Huddle01 failed, falling back to Agora..."
+                );
                 setCurrentCallProvider("agora");
-                
+
                 // Generate Agora channel name
                 const addresses = [
                     userAddress.toLowerCase(),
                     friend.address.toLowerCase(),
                 ].sort();
-                const agoraChannelName = `spritz_${addresses[0].slice(2, 10)}_${addresses[1].slice(2, 10)}`;
-                
+                const agoraChannelName = `spritz_${addresses[0].slice(
+                    2,
+                    10
+                )}_${addresses[1].slice(2, 10)}`;
+
                 // Update the signaling record with the new channel name
                 await endCallSignaling();
                 const fallbackRecord = await startCall(
@@ -996,22 +1048,31 @@ function DashboardContent({
                     callerDisplayName,
                     withVideo ? "video" : "audio"
                 );
-                
+
                 if (fallbackRecord) {
-                    success = await agoraCall.joinCall(agoraChannelName, undefined, withVideo);
+                    success = await agoraCall.joinCall(
+                        agoraChannelName,
+                        undefined,
+                        withVideo
+                    );
                     if (success) {
                         setToast({
                             sender: "Spritz",
-                            message: "Using centralized call (Huddle01 unavailable)",
+                            message:
+                                "Using centralized call (Huddle01 unavailable)",
                         });
                         setTimeout(() => setToast(null), 4000);
                     }
                 }
             }
         } else {
-            success = await agoraCall.joinCall(channelName, undefined, withVideo);
+            success = await agoraCall.joinCall(
+                channelName,
+                undefined,
+                withVideo
+            );
         }
-        
+
         if (success && userSettings.soundEnabled) {
             notifyCallConnected();
         }
@@ -1032,11 +1093,11 @@ function DashboardContent({
             }
             // Join the call channel with video if it's a video call
             const withVideo = callType === "video";
-            
+
             // Detect if this is a decentralized (Huddle01) or centralized (Agora) call
             // Agora channels start with "spritz_", Huddle01 uses room IDs
             const isDecentralizedCall = !channelName.startsWith("spritz_");
-            
+
             console.log(
                 "[Dashboard] Accepting call, type:",
                 callType,
@@ -1045,26 +1106,36 @@ function DashboardContent({
                 "isDecentralized:",
                 isDecentralizedCall
             );
-            
+
             // Set the provider BEFORE joining so UI uses correct state
-            let provider: "huddle01" | "agora" = (isDecentralizedCall && isHuddle01Configured) ? "huddle01" : "agora";
+            let provider: "huddle01" | "agora" =
+                isDecentralizedCall && isHuddle01Configured
+                    ? "huddle01"
+                    : "agora";
             setCurrentCallProvider(provider);
-            
+
             // Use the appropriate call provider based on the channel type
             let success: boolean;
             if (provider === "huddle01") {
-                success = await huddle01Call.joinCall(channelName, undefined, withVideo);
-                
+                success = await huddle01Call.joinCall(
+                    channelName,
+                    undefined,
+                    withVideo
+                );
+
                 // If Huddle01 fails, fall back to Agora (caller will need to retry with Agora)
                 if (!success && isAgoraConfigured) {
-                    console.log("[Dashboard] Huddle01 failed to accept, falling back to Agora...");
+                    console.log(
+                        "[Dashboard] Huddle01 failed to accept, falling back to Agora..."
+                    );
                     setCurrentCallProvider("agora");
                     provider = "agora";
                     // For incoming calls, we can't change the channel - the caller needs to reinitiate
                     // Just show a message
                     setToast({
                         sender: "Spritz",
-                        message: "Decentralized call failed. Ask caller to try again.",
+                        message:
+                            "Decentralized call failed. Ask caller to try again.",
                     });
                     setTimeout(() => setToast(null), 4000);
                     setCurrentCallFriend(null);
@@ -1072,9 +1143,13 @@ function DashboardContent({
                     return;
                 }
             } else {
-                success = await agoraCall.joinCall(channelName, undefined, withVideo);
+                success = await agoraCall.joinCall(
+                    channelName,
+                    undefined,
+                    withVideo
+                );
             }
-            
+
             if (success && userSettings.soundEnabled) {
                 notifyCallConnected();
             }
@@ -1116,7 +1191,7 @@ function DashboardContent({
                 trackVoiceCall(callDurationMinutes);
             }
         }
-        
+
         if (userSettings.soundEnabled) {
             notifyCallEnded();
         }
@@ -1262,7 +1337,7 @@ function DashboardContent({
                                                 transition={{ duration: 0.15 }}
                                                 className="absolute left-0 top-full mt-2 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-50"
                                             >
-                                                {/* Status */}
+                                                {/* 1. Status */}
                                                 <button
                                                     onClick={() => {
                                                         setIsProfileMenuOpen(
@@ -1295,179 +1370,7 @@ function DashboardContent({
                                                     )}
                                                 </button>
 
-                                                {/* Points */}
-                                                <div className="px-4 py-3 flex items-center gap-3 border-t border-zinc-800">
-                                                    <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                                                        <svg
-                                                            className="w-4 h-4 text-amber-400"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                                            />
-                                                        </svg>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-white text-sm font-medium">
-                                                            Points
-                                                        </p>
-                                                        <p className="text-amber-400 text-xs">
-                                                            {userPoints.toLocaleString()} pts
-                                                        </p>
-                                                    </div>
-                                                    <div className="bg-amber-500/20 px-2 py-0.5 rounded-full">
-                                                        <span className="text-amber-400 text-xs font-medium">
-                                                            {userPoints.toLocaleString()}
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Username */}
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileMenuOpen(
-                                                            false
-                                                        );
-                                                        setIsUsernameModalOpen(
-                                                            true
-                                                        );
-                                                    }}
-                                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
-                                                >
-                                                    <div
-                                                        className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                                            reachUsername
-                                                                ? "bg-[#FB8D22]/20"
-                                                                : "bg-zinc-800"
-                                                        }`}
-                                                    >
-                                                        <svg
-                                                            className={`w-4 h-4 ${
-                                                                reachUsername
-                                                                    ? "text-[#FFBBA7]"
-                                                                    : "text-zinc-500"
-                                                            }`}
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                                                            />
-                                                        </svg>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-white text-sm font-medium">
-                                                            Username
-                                                        </p>
-                                                        <p
-                                                            className={`text-xs truncate ${
-                                                                reachUsername
-                                                                    ? "text-[#FFBBA7]"
-                                                                    : "text-zinc-500"
-                                                            }`}
-                                                        >
-                                                            {reachUsername
-                                                                ? `@${reachUsername}`
-                                                                : "Claim a username"}
-                                                        </p>
-                                                    </div>
-                                                    {reachUsername && (
-                                                        <svg
-                                                            className="w-4 h-4 text-[#FFBBA7]"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M5 13l4 4L19 7"
-                                                            />
-                                                        </svg>
-                                                    )}
-                                                </button>
-
-                                                {/* Phone */}
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileMenuOpen(
-                                                            false
-                                                        );
-                                                        setIsPhoneModalOpen(
-                                                            true
-                                                        );
-                                                    }}
-                                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
-                                                >
-                                                    <div
-                                                        className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                                            isPhoneVerified
-                                                                ? "bg-emerald-500/20"
-                                                                : "bg-zinc-800"
-                                                        }`}
-                                                    >
-                                                        <svg
-                                                            className={`w-4 h-4 ${
-                                                                isPhoneVerified
-                                                                    ? "text-emerald-400"
-                                                                    : "text-zinc-500"
-                                                            }`}
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                                                            />
-                                                        </svg>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-white text-sm font-medium">
-                                                            Phone
-                                                        </p>
-                                                        <p
-                                                            className={`text-xs truncate ${
-                                                                isPhoneVerified
-                                                                    ? "text-emerald-400"
-                                                                    : "text-zinc-500"
-                                                            }`}
-                                                        >
-                                                            {isPhoneVerified
-                                                                ? "Verified"
-                                                                : "Add phone number"}
-                                                        </p>
-                                                    </div>
-                                                    {isPhoneVerified && (
-                                                        <svg
-                                                            className="w-4 h-4 text-emerald-400"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M5 13l4 4L19 7"
-                                                            />
-                                                        </svg>
-                                                    )}
-                                                </button>
-
-                                                {/* QR Code */}
+                                                {/* 2. My QR Code */}
                                                 <button
                                                     onClick={() => {
                                                         setIsProfileMenuOpen(
@@ -1504,13 +1407,13 @@ function DashboardContent({
                                                     </div>
                                                 </button>
 
-                                                {/* Socials */}
+                                                {/* 3. Username */}
                                                 <button
                                                     onClick={() => {
                                                         setIsProfileMenuOpen(
                                                             false
                                                         );
-                                                        setIsSocialsModalOpen(
+                                                        setIsUsernameModalOpen(
                                                             true
                                                         );
                                                     }}
@@ -1518,15 +1421,15 @@ function DashboardContent({
                                                 >
                                                     <div
                                                         className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                                            socialCount > 0
-                                                                ? "bg-[#FFBBA7]/20"
+                                                            reachUsername
+                                                                ? "bg-emerald-500/20"
                                                                 : "bg-zinc-800"
                                                         }`}
                                                     >
                                                         <svg
                                                             className={`w-4 h-4 ${
-                                                                socialCount > 0
-                                                                    ? "text-[#FFBBA7]"
+                                                                reachUsername
+                                                                    ? "text-emerald-400"
                                                                     : "text-zinc-500"
                                                             }`}
                                                             fill="none"
@@ -1537,29 +1440,29 @@ function DashboardContent({
                                                                 strokeLinecap="round"
                                                                 strokeLinejoin="round"
                                                                 strokeWidth={2}
-                                                                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                                                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                                                             />
                                                         </svg>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-white text-sm font-medium">
-                                                            Socials
+                                                            Username
                                                         </p>
                                                         <p
-                                                            className={`text-xs ${
-                                                                socialCount > 0
-                                                                    ? "text-[#FFBBA7]"
+                                                            className={`text-xs truncate ${
+                                                                reachUsername
+                                                                    ? "text-emerald-400"
                                                                     : "text-zinc-500"
                                                             }`}
                                                         >
-                                                            {socialCount > 0
-                                                                ? `${socialCount} connected`
-                                                                : "Add your socials"}
+                                                            {reachUsername
+                                                                ? `@${reachUsername}`
+                                                                : "Claim a username (+10 pts)"}
                                                         </p>
                                                     </div>
-                                                    {socialCount > 0 && (
+                                                    {reachUsername && (
                                                         <svg
-                                                            className="w-4 h-4 text-[#FFBBA7]"
+                                                            className="w-4 h-4 text-emerald-400"
                                                             fill="none"
                                                             viewBox="0 0 24 24"
                                                             stroke="currentColor"
@@ -1574,11 +1477,15 @@ function DashboardContent({
                                                     )}
                                                 </button>
 
-                                                {/* Email */}
+                                                {/* 4. Email */}
                                                 <button
                                                     onClick={() => {
-                                                        setIsProfileMenuOpen(false);
-                                                        setIsEmailModalOpen(true);
+                                                        setIsProfileMenuOpen(
+                                                            false
+                                                        );
+                                                        setIsEmailModalOpen(
+                                                            true
+                                                        );
                                                     }}
                                                     className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
                                                 >
@@ -1640,17 +1547,31 @@ function DashboardContent({
                                                     )}
                                                 </button>
 
-                                                {/* Invites */}
+                                                {/* 5. Phone */}
                                                 <button
                                                     onClick={() => {
-                                                        setIsProfileMenuOpen(false);
-                                                        setIsInvitesModalOpen(true);
+                                                        setIsProfileMenuOpen(
+                                                            false
+                                                        );
+                                                        setIsPhoneModalOpen(
+                                                            true
+                                                        );
                                                     }}
                                                     className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-[#FB8D22]/20 flex items-center justify-center">
+                                                    <div
+                                                        className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                                            isPhoneVerified
+                                                                ? "bg-emerald-500/20"
+                                                                : "bg-zinc-800"
+                                                        }`}
+                                                    >
                                                         <svg
-                                                            className="w-4 h-4 text-[#FFBBA7]"
+                                                            className={`w-4 h-4 ${
+                                                                isPhoneVerified
+                                                                    ? "text-emerald-400"
+                                                                    : "text-zinc-500"
+                                                            }`}
                                                             fill="none"
                                                             viewBox="0 0 24 24"
                                                             stroke="currentColor"
@@ -1659,26 +1580,114 @@ function DashboardContent({
                                                                 strokeLinecap="round"
                                                                 strokeLinejoin="round"
                                                                 strokeWidth={2}
-                                                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+                                                                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
                                                             />
                                                         </svg>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-white text-sm font-medium">
-                                                            Invites
+                                                            Phone
                                                         </p>
-                                                        <p className="text-[#FFBBA7] text-xs">
-                                                            {availableInvites} codes available
+                                                        <p
+                                                            className={`text-xs truncate ${
+                                                                isPhoneVerified
+                                                                    ? "text-emerald-400"
+                                                                    : "text-zinc-500"
+                                                            }`}
+                                                        >
+                                                            {isPhoneVerified
+                                                                ? "Verified"
+                                                                : "Add phone (+100 pts)"}
                                                         </p>
                                                     </div>
-                                                    <div className="bg-[#FB8D22]/20 px-2 py-0.5 rounded-full">
-                                                        <span className="text-[#FFBBA7] text-xs font-medium">
-                                                            {availableInvites}
-                                                        </span>
-                                                    </div>
+                                                    {isPhoneVerified && (
+                                                        <svg
+                                                            className="w-4 h-4 text-emerald-400"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M5 13l4 4L19 7"
+                                                            />
+                                                        </svg>
+                                                    )}
                                                 </button>
 
-                                                {/* ENS/SNS Name Service */}
+                                                {/* 6. Socials */}
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileMenuOpen(
+                                                            false
+                                                        );
+                                                        setIsSocialsModalOpen(
+                                                            true
+                                                        );
+                                                    }}
+                                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
+                                                >
+                                                    <div
+                                                        className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                                            socialCount > 0
+                                                                ? "bg-emerald-500/20"
+                                                                : "bg-zinc-800"
+                                                        }`}
+                                                    >
+                                                        <svg
+                                                            className={`w-4 h-4 ${
+                                                                socialCount > 0
+                                                                    ? "text-emerald-400"
+                                                                    : "text-zinc-500"
+                                                            }`}
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                                                            />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-white text-sm font-medium">
+                                                            Socials
+                                                        </p>
+                                                        <p
+                                                            className={`text-xs ${
+                                                                socialCount > 0
+                                                                    ? "text-emerald-400"
+                                                                    : "text-zinc-500"
+                                                            }`}
+                                                        >
+                                                            {socialCount > 0
+                                                                ? `${socialCount} connected`
+                                                                : "Add your socials (+10 pts)"}
+                                                        </p>
+                                                    </div>
+                                                    {socialCount > 0 && (
+                                                        <svg
+                                                            className="w-4 h-4 text-emerald-400"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M5 13l4 4L19 7"
+                                                            />
+                                                        </svg>
+                                                    )}
+                                                </button>
+
+                                                {/* 7. ENS/SNS Name Service */}
                                                 {isSolanaUser ? (
                                                     // Solana users - show SNS link
                                                     <a
@@ -1721,9 +1730,9 @@ function DashboardContent({
                                                 ) : userENS.ensName ? (
                                                     // EVM users with ENS
                                                     <div className="px-4 py-3 flex items-center gap-3 border-t border-zinc-800">
-                                                        <div className="w-8 h-8 rounded-lg bg-[#FF5500]/20 flex items-center justify-center">
+                                                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
                                                             <svg
-                                                                className="w-4 h-4 text-[#FFBBA7]"
+                                                                className="w-4 h-4 text-emerald-400"
                                                                 fill="none"
                                                                 viewBox="0 0 24 24"
                                                                 stroke="currentColor"
@@ -1742,12 +1751,25 @@ function DashboardContent({
                                                             <p className="text-white text-sm font-medium">
                                                                 ENS
                                                             </p>
-                                                            <p className="text-[#FFBBA7] text-xs truncate">
+                                                            <p className="text-emerald-400 text-xs truncate">
                                                                 {
                                                                     userENS.ensName
                                                                 }
                                                             </p>
                                                         </div>
+                                                        <svg
+                                                            className="w-4 h-4 text-emerald-400"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M5 13l4 4L19 7"
+                                                            />
+                                                        </svg>
                                                     </div>
                                                 ) : (
                                                     // EVM users without ENS
@@ -1790,7 +1812,80 @@ function DashboardContent({
                                                     </a>
                                                 )}
 
-                                                {/* Settings */}
+                                                {/* 8. Points */}
+                                                {(() => {
+                                                    const hasNameService =
+                                                        userENS.ensName ||
+                                                        isSolanaUser; // Solana users can have SNS
+                                                    const isPointsVerified =
+                                                        userPoints > 0 &&
+                                                        hasNameService;
+                                                    return (
+                                                        <div className="px-4 py-3 flex items-center gap-3 border-t border-zinc-800">
+                                                            <div
+                                                                className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                                                    isPointsVerified
+                                                                        ? "bg-emerald-500/20"
+                                                                        : "bg-amber-500/20"
+                                                                }`}
+                                                            >
+                                                                <svg
+                                                                    className={`w-4 h-4 ${
+                                                                        isPointsVerified
+                                                                            ? "text-emerald-400"
+                                                                            : "text-amber-400"
+                                                                    }`}
+                                                                    fill="none"
+                                                                    viewBox="0 0 24 24"
+                                                                    stroke="currentColor"
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        strokeWidth={
+                                                                            2
+                                                                        }
+                                                                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                                    />
+                                                                </svg>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-white text-sm font-medium">
+                                                                    Points
+                                                                </p>
+                                                                <p
+                                                                    className={`text-xs ${
+                                                                        isPointsVerified
+                                                                            ? "text-emerald-400"
+                                                                            : "text-amber-400"
+                                                                    }`}
+                                                                >
+                                                                    {userPoints.toLocaleString()}{" "}
+                                                                    pts
+                                                                </p>
+                                                            </div>
+                                                            <div
+                                                                className={`px-2 py-0.5 rounded-full ${
+                                                                    isPointsVerified
+                                                                        ? "bg-emerald-500/20"
+                                                                        : "bg-amber-500/20"
+                                                                }`}
+                                                            >
+                                                                <span
+                                                                    className={`text-xs font-medium ${
+                                                                        isPointsVerified
+                                                                            ? "text-emerald-400"
+                                                                            : "text-amber-400"
+                                                                    }`}
+                                                                >
+                                                                    {userPoints.toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                {/* 9. Settings */}
                                                 <button
                                                     onClick={() => {
                                                         setIsProfileMenuOpen(
@@ -1844,11 +1939,13 @@ function DashboardContent({
                                                         }
                                                         className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
                                                     >
-                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                                            isSuperAdmin
-                                                                ? "bg-amber-500/20"
-                                                                : "bg-[#FB8D22]/20"
-                                                        }`}>
+                                                        <div
+                                                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                                                isSuperAdmin
+                                                                    ? "bg-amber-500/20"
+                                                                    : "bg-[#FB8D22]/20"
+                                                            }`}
+                                                        >
                                                             <svg
                                                                 className={`w-4 h-4 ${
                                                                     isSuperAdmin
@@ -1862,7 +1959,9 @@ function DashboardContent({
                                                                 <path
                                                                     strokeLinecap="round"
                                                                     strokeLinejoin="round"
-                                                                    strokeWidth={2}
+                                                                    strokeWidth={
+                                                                        2
+                                                                    }
                                                                     d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                                                                 />
                                                             </svg>
@@ -1871,11 +1970,13 @@ function DashboardContent({
                                                             <p className="text-white text-sm font-medium">
                                                                 Admin Panel
                                                             </p>
-                                                            <p className={`text-xs ${
-                                                                isSuperAdmin
-                                                                    ? "text-amber-400"
-                                                                    : "text-[#FFBBA7]"
-                                                            }`}>
+                                                            <p
+                                                                className={`text-xs ${
+                                                                    isSuperAdmin
+                                                                        ? "text-amber-400"
+                                                                        : "text-[#FFBBA7]"
+                                                                }`}
+                                                            >
                                                                 {isSuperAdmin
                                                                     ? "Super Admin"
                                                                     : "Admin"}
@@ -2657,7 +2758,9 @@ function DashboardContent({
                     }
                     callerAvatar={incomingCallFriend?.avatar}
                     callType={incomingCall.call_type || "audio"}
-                    isDecentralized={!incomingCall.channel_name.startsWith("spritz_")}
+                    isDecentralized={
+                        !incomingCall.channel_name.startsWith("spritz_")
+                    }
                     onAccept={handleAcceptCall}
                     onReject={handleRejectCall}
                 />
@@ -2764,7 +2867,10 @@ function DashboardContent({
                 isOpen={isEmailModalOpen}
                 onClose={() => setIsEmailModalOpen(false)}
                 walletAddress={userAddress}
-                onVerified={refreshEmail}
+                onVerified={() => {
+                    refreshEmail();
+                    refreshPoints();
+                }}
             />
 
             {/* Invites Modal */}
