@@ -17,6 +17,52 @@ const PERSONALITY_SUGGESTIONS = [
     "Analytical thinker who provides detailed insights",
 ];
 
+// Pre-built agent templates
+const AGENT_TEMPLATES = [
+    {
+        id: "code-helper",
+        name: "Code Helper",
+        emoji: "💻",
+        personality: "Expert programmer who helps with coding questions. Explains code clearly, suggests best practices, and helps debug issues. Writes clean, well-commented code examples.",
+        color: "from-blue-500 to-cyan-500",
+    },
+    {
+        id: "writing-assistant",
+        name: "Writing Assistant",
+        emoji: "✍️",
+        personality: "Creative writing helper who assists with crafting compelling content. Helps with grammar, style, tone, and structure. Provides constructive feedback and suggestions.",
+        color: "from-purple-500 to-pink-500",
+    },
+    {
+        id: "research-buddy",
+        name: "Research Buddy",
+        emoji: "🔬",
+        personality: "Thorough researcher who helps find and analyze information. Summarizes complex topics, cites sources when possible, and asks clarifying questions to understand your needs.",
+        color: "from-emerald-500 to-teal-500",
+    },
+    {
+        id: "brainstorm-partner",
+        name: "Brainstorm Partner",
+        emoji: "💡",
+        personality: "Creative thinking partner who generates innovative ideas. Uses techniques like mind mapping, lateral thinking, and 'yes, and...' to build on concepts. Never dismisses ideas.",
+        color: "from-amber-500 to-orange-500",
+    },
+    {
+        id: "study-tutor",
+        name: "Study Tutor",
+        emoji: "📚",
+        personality: "Patient educator who breaks down complex subjects into digestible pieces. Uses analogies, examples, and practice questions. Adapts explanations based on understanding level.",
+        color: "from-indigo-500 to-purple-500",
+    },
+    {
+        id: "fitness-coach",
+        name: "Fitness Coach",
+        emoji: "💪",
+        personality: "Motivating fitness advisor who provides workout tips, nutrition guidance, and encouragement. Emphasizes safety and sustainable habits. Celebrates progress of all sizes.",
+        color: "from-red-500 to-pink-500",
+    },
+];
+
 interface CreateAgentModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -30,6 +76,14 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
     const [visibility, setVisibility] = useState<"private" | "friends" | "public">("private");
     const [isCreating, setIsCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showTemplates, setShowTemplates] = useState(true);
+
+    const applyTemplate = (template: typeof AGENT_TEMPLATES[0]) => {
+        setName(template.name);
+        setEmoji(template.emoji);
+        setPersonality(template.personality);
+        setShowTemplates(false);
+    };
 
     const handleCreate = async () => {
         if (!name.trim()) {
@@ -47,12 +101,23 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
             setPersonality("");
             setEmoji("🤖");
             setVisibility("private");
+            setShowTemplates(true);
             onClose();
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to create agent");
         } finally {
             setIsCreating(false);
         }
+    };
+
+    const handleClose = () => {
+        setName("");
+        setPersonality("");
+        setEmoji("🤖");
+        setVisibility("private");
+        setShowTemplates(true);
+        setError(null);
+        onClose();
     };
 
     return (
@@ -63,7 +128,7 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50"
-                    onClick={onClose}
+                    onClick={handleClose}
                 >
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -73,14 +138,26 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-2xl">
-                                {emoji}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-2xl">
+                                    {emoji}
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">Create AI Agent</h2>
+                                    <p className="text-sm text-zinc-400">
+                                        {showTemplates ? "Choose a template or start from scratch" : "Customize your agent"}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-white">Create AI Agent</h2>
-                                <p className="text-sm text-zinc-400">Build your custom AI assistant</p>
-                            </div>
+                            <button
+                                onClick={handleClose}
+                                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                         </div>
 
                         {/* Error */}
@@ -90,8 +167,42 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
                             </div>
                         )}
 
+                        {/* Templates */}
+                        {showTemplates && (
+                            <div className="mb-6">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-medium text-zinc-300">Quick Start Templates</h3>
+                                    <button
+                                        onClick={() => setShowTemplates(false)}
+                                        className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                                    >
+                                        Start from scratch →
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {AGENT_TEMPLATES.map((template) => (
+                                        <button
+                                            key={template.id}
+                                            onClick={() => applyTemplate(template)}
+                                            className="p-3 bg-zinc-800/50 border border-zinc-700 rounded-xl hover:border-purple-500/50 hover:bg-zinc-800 transition-all text-left group"
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`w-8 h-8 rounded-lg bg-gradient-to-br ${template.color} flex items-center justify-center text-lg group-hover:scale-110 transition-transform`}>
+                                                    {template.emoji}
+                                                </span>
+                                                <span className="font-medium text-white text-sm">{template.name}</span>
+                                            </div>
+                                            <p className="text-xs text-zinc-500 line-clamp-2">
+                                                {template.personality.slice(0, 60)}...
+                                            </p>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Form */}
-                        <div className="space-y-5">
+                        <div className={`space-y-5 ${showTemplates ? "opacity-50 pointer-events-none" : ""}`}>
                             {/* Name */}
                             <div>
                                 <label className="block text-sm font-medium text-zinc-300 mb-2">
@@ -207,7 +318,7 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
                         {/* Actions */}
                         <div className="flex gap-3 mt-6">
                             <button
-                                onClick={onClose}
+                                onClick={handleClose}
                                 className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-colors"
                             >
                                 Cancel

@@ -34,6 +34,8 @@ type TimeSeriesItem = {
     friendRequests: number;
     groups: number;
     invites: number;
+    agents: number;
+    agentChats: number;
 };
 
 type TopUser = {
@@ -46,6 +48,20 @@ type TopUser = {
 type PointsBreakdown = {
     reason: string;
     points: number;
+};
+
+type TopAgent = {
+    id: string;
+    name: string;
+    emoji: string;
+    ownerAddress: string;
+    visibility: string;
+    value: number;
+};
+
+type AgentVisibility = {
+    visibility: string;
+    count: number;
 };
 
 type AnalyticsData = {
@@ -64,6 +80,17 @@ type AnalyticsData = {
         acceptedFriendships: number;
         groupsCreated: number;
         invitesUsed: number;
+        // Agent stats
+        totalAgents: number;
+        newAgentsCount: number;
+        publicAgents: number;
+        friendsAgents: number;
+        privateAgents: number;
+        totalAgentMessages: number;
+        agentMessagesInPeriod: number;
+        uniqueAgentUsers: number;
+        knowledgeItemsCount: number;
+        indexedKnowledgeItems: number;
     };
     timeSeries: TimeSeriesItem[];
     topUsers: {
@@ -71,6 +98,10 @@ type AnalyticsData = {
         byMessages: TopUser[];
         byFriends: TopUser[];
     };
+    topAgents: {
+        byMessages: TopAgent[];
+    };
+    agentVisibilityBreakdown: AgentVisibility[];
     pointsBreakdown: PointsBreakdown[];
     period: string;
     startDate: string;
@@ -120,7 +151,7 @@ export default function AnalyticsPage() {
     const [data, setData] = useState<AnalyticsData | null>(null);
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [selectedPeriod, setSelectedPeriod] = useState<Period>("7d");
-    const [activeChart, setActiveChart] = useState<"users" | "engagement" | "points">("users");
+    const [activeChart, setActiveChart] = useState<"users" | "engagement" | "points" | "agents">("users");
 
     const formatAddress = (addr: string) =>
         `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -363,6 +394,44 @@ export default function AnalyticsPage() {
                         />
                     </div>
 
+                    {/* AI Agents Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <SummaryCard
+                            label="Total Agents"
+                            value={data.summary.totalAgents}
+                            icon="🤖"
+                            color="from-purple-500/20 to-purple-600/10"
+                        />
+                        <SummaryCard
+                            label="New Agents"
+                            value={data.summary.newAgentsCount}
+                            subtext={`in ${selectedPeriod}`}
+                            icon="✨"
+                            color="from-indigo-500/20 to-indigo-600/10"
+                        />
+                        <SummaryCard
+                            label="Agent Messages"
+                            value={data.summary.agentMessagesInPeriod}
+                            subtext={`(${data.summary.totalAgentMessages.toLocaleString()} total)`}
+                            icon="💬"
+                            color="from-cyan-500/20 to-cyan-600/10"
+                        />
+                        <SummaryCard
+                            label="Unique Users"
+                            value={data.summary.uniqueAgentUsers}
+                            subtext="using agents"
+                            icon="👤"
+                            color="from-emerald-500/20 to-emerald-600/10"
+                        />
+                        <SummaryCard
+                            label="Knowledge Items"
+                            value={data.summary.knowledgeItemsCount}
+                            subtext={`${data.summary.indexedKnowledgeItems} indexed`}
+                            icon="📚"
+                            color="from-amber-500/20 to-amber-600/10"
+                        />
+                    </div>
+
                     {/* Call Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-zinc-900/50 rounded-2xl p-6 border border-zinc-800">
@@ -419,6 +488,16 @@ export default function AnalyticsPage() {
                             }`}
                         >
                             Points
+                        </button>
+                        <button
+                            onClick={() => setActiveChart("agents")}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                activeChart === "agents"
+                                    ? "bg-[#FF5500] text-white"
+                                    : "bg-zinc-800 text-zinc-400 hover:text-white"
+                            }`}
+                        >
+                            🤖 AI Agents
                         </button>
                     </div>
 
@@ -575,6 +654,60 @@ export default function AnalyticsPage() {
                                     </div>
                                 </>
                             )}
+
+                            {activeChart === "agents" && (
+                                <>
+                                    <h3 className="text-lg font-semibold mb-4">🤖 AI Agents Activity</h3>
+                                    <div className="h-80">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={data.timeSeries}>
+                                                <defs>
+                                                    <linearGradient id="colorAgents" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                                                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                                                    </linearGradient>
+                                                    <linearGradient id="colorAgentChats" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.3} />
+                                                        <stop offset="95%" stopColor="#06B6D4" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                                <XAxis 
+                                                    dataKey="label" 
+                                                    stroke="#666"
+                                                    tick={{ fill: "#999", fontSize: 12 }}
+                                                />
+                                                <YAxis stroke="#666" tick={{ fill: "#999", fontSize: 12 }} />
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: "#18181b",
+                                                        border: "1px solid #333",
+                                                        borderRadius: "8px",
+                                                    }}
+                                                    labelStyle={{ color: "#fff" }}
+                                                />
+                                                <Legend />
+                                                <Area
+                                                    type="monotone"
+                                                    dataKey="agents"
+                                                    name="New Agents"
+                                                    stroke="#8B5CF6"
+                                                    fill="url(#colorAgents)"
+                                                    strokeWidth={2}
+                                                />
+                                                <Area
+                                                    type="monotone"
+                                                    dataKey="agentChats"
+                                                    name="Agent Chats"
+                                                    stroke="#06B6D4"
+                                                    fill="url(#colorAgentChats)"
+                                                    strokeWidth={2}
+                                                />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </>
+                            )}
                         </motion.div>
                     </AnimatePresence>
 
@@ -719,6 +852,101 @@ export default function AnalyticsPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Agent Analytics */}
+                    {data.summary.totalAgents > 0 && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Agent Visibility Breakdown */}
+                            {data.agentVisibilityBreakdown.length > 0 && (
+                                <div className="bg-zinc-900/50 rounded-2xl p-6 border border-zinc-800">
+                                    <h3 className="text-lg font-semibold mb-4">🤖 Agent Visibility</h3>
+                                    <div className="h-64">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={data.agentVisibilityBreakdown}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    labelLine={false}
+                                                    label={(props) => {
+                                                        const { name, percent } = props as { name?: string; percent?: number };
+                                                        const displayPercent = ((percent || 0) * 100).toFixed(0);
+                                                        return `${name} (${displayPercent}%)`;
+                                                    }}
+                                                    outerRadius={80}
+                                                    fill="#8884d8"
+                                                    dataKey="count"
+                                                    nameKey="visibility"
+                                                >
+                                                    {data.agentVisibilityBreakdown.map((_, index) => (
+                                                        <Cell
+                                                            key={`cell-${index}`}
+                                                            fill={["#6B7280", "#3B82F6", "#10B981"][index % 3]}
+                                                        />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: "#18181b",
+                                                        border: "1px solid #333",
+                                                        borderRadius: "8px",
+                                                    }}
+                                                    formatter={(value) => [`${value} agents`, "Count"]}
+                                                />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="mt-4 space-y-2">
+                                        {data.agentVisibilityBreakdown.map((item, index) => (
+                                            <div key={item.visibility} className="flex items-center justify-between text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <div
+                                                        className="w-3 h-3 rounded-full"
+                                                        style={{ backgroundColor: ["#6B7280", "#3B82F6", "#10B981"][index % 3] }}
+                                                    />
+                                                    <span className="text-zinc-400">
+                                                        {item.visibility === "Private" ? "🔒" : item.visibility === "Friends" ? "👥" : "🌍"} {item.visibility}
+                                                    </span>
+                                                </div>
+                                                <span className="font-medium">{item.count}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Top Agents */}
+                            <div className="bg-zinc-900/50 rounded-2xl p-6 border border-zinc-800">
+                                <h3 className="text-lg font-semibold mb-4">🏆 Top Agents by Messages</h3>
+                                <div className="space-y-3">
+                                    {data.topAgents.byMessages.length === 0 ? (
+                                        <p className="text-zinc-500 text-center py-8">No agent activity yet</p>
+                                    ) : (
+                                        data.topAgents.byMessages.slice(0, 10).map((agent, index) => (
+                                            <div
+                                                key={agent.id}
+                                                className="flex items-center justify-between bg-zinc-800/50 rounded-lg px-4 py-3"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-zinc-500 w-5 text-sm">{index + 1}.</span>
+                                                    <span className="text-2xl">{agent.emoji}</span>
+                                                    <div>
+                                                        <p className="font-medium">{agent.name}</p>
+                                                        <p className="text-xs text-zinc-500">
+                                                            {agent.visibility === "private" ? "🔒" : agent.visibility === "friends" ? "👥" : "🌍"} {agent.ownerAddress.slice(0, 6)}...{agent.ownerAddress.slice(-4)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className="text-cyan-400 font-medium">
+                                                    {agent.value.toLocaleString()} msgs
+                                                </span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

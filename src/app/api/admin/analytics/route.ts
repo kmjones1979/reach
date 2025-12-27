@@ -149,6 +149,32 @@ export async function GET(request: NextRequest) {
             .not("used_at", "is", null)
             .order("used_at", { ascending: true });
 
+        // Fetch all agents data
+        const { data: allAgents } = await supabase
+            .from("shout_agents")
+            .select("*");
+
+        // Fetch agents created in period
+        const { data: newAgents } = await supabase
+            .from("shout_agents")
+            .select("created_at, owner_address, visibility, message_count, name")
+            .gte("created_at", startDate.toISOString())
+            .order("created_at", { ascending: true });
+
+        // Fetch agent chats in period
+        const { data: agentChats } = await supabase
+            .from("shout_agent_chats")
+            .select("created_at, agent_id, user_address, role")
+            .gte("created_at", startDate.toISOString())
+            .order("created_at", { ascending: true });
+
+        // Fetch knowledge items
+        const { data: knowledgeItems } = await supabase
+            .from("shout_agent_knowledge")
+            .select("created_at, status, agent_id")
+            .gte("created_at", startDate.toISOString())
+            .order("created_at", { ascending: true });
+
         // Calculate summary stats
         const totalUsers = allUsers?.length || 0;
         const newUsersCount = newUsers?.length || 0;
@@ -165,6 +191,18 @@ export async function GET(request: NextRequest) {
         const groupsCreated = groups?.length || 0;
         const invitesUsed = usedInvites?.length || 0;
 
+        // Agent stats
+        const totalAgents = allAgents?.length || 0;
+        const newAgentsCount = newAgents?.length || 0;
+        const publicAgents = allAgents?.filter(a => a.visibility === "public").length || 0;
+        const friendsAgents = allAgents?.filter(a => a.visibility === "friends").length || 0;
+        const privateAgents = allAgents?.filter(a => a.visibility === "private").length || 0;
+        const totalAgentMessages = allAgents?.reduce((sum, a) => sum + (a.message_count || 0), 0) || 0;
+        const agentMessagesInPeriod = agentChats?.filter(c => c.role === "user").length || 0;
+        const uniqueAgentUsers = new Set(agentChats?.map(c => c.user_address) || []).size;
+        const knowledgeItemsCount = knowledgeItems?.length || 0;
+        const indexedKnowledgeItems = knowledgeItems?.filter(k => k.status === "indexed").length || 0;
+
         // Generate time series data
         const timeSeriesData = generateTimeSeries(
             startDate,
@@ -178,6 +216,8 @@ export async function GET(request: NextRequest) {
                 friendRequests: friendRequests || [],
                 groups: groups || [],
                 invites: usedInvites || [],
+                agents: newAgents || [],
+                agentChats: agentChats || [],
             }
         );
 
@@ -212,6 +252,26 @@ export async function GET(request: NextRequest) {
                 value: u.friends_count || 0,
             }));
 
+        // Top agents by messages
+        const topAgentsByMessages = [...(allAgents || [])]
+            .sort((a, b) => (b.message_count || 0) - (a.message_count || 0))
+            .slice(0, 10)
+            .map(a => ({
+                id: a.id,
+                name: a.name,
+                emoji: a.avatar_emoji,
+                ownerAddress: a.owner_address,
+                visibility: a.visibility,
+                value: a.message_count || 0,
+            }));
+
+        // Agent visibility breakdown
+        const agentVisibilityBreakdown = [
+            { visibility: "Private", count: privateAgents },
+            { visibility: "Friends", count: friendsAgents },
+            { visibility: "Public", count: publicAgents },
+        ].filter(v => v.count > 0);
+
         // Points breakdown
         const pointsBreakdown: Record<string, number> = {};
         for (const p of pointsHistory || []) {
@@ -235,6 +295,17 @@ export async function GET(request: NextRequest) {
                 acceptedFriendships,
                 groupsCreated,
                 invitesUsed,
+                // Agent stats
+                totalAgents,
+                newAgentsCount,
+                publicAgents,
+                friendsAgents,
+                privateAgents,
+                totalAgentMessages,
+                agentMessagesInPeriod,
+                uniqueAgentUsers,
+                knowledgeItemsCount,
+                indexedKnowledgeItems,
             },
             timeSeries: timeSeriesData,
             topUsers: {
@@ -242,6 +313,10 @@ export async function GET(request: NextRequest) {
                 byMessages: topUsersByMessages,
                 byFriends: topUsersByFriends,
             },
+            topAgents: {
+                byMessages: topAgentsByMessages,
+            },
+            agentVisibilityBreakdown,
             pointsBreakdown: Object.entries(pointsBreakdown).map(([reason, points]) => ({
                 reason,
                 points,
@@ -264,6 +339,8 @@ interface DataSources {
     friendRequests: { created_at: string }[];
     groups: { created_at: string }[];
     invites: { used_at: string }[];
+    agents: { created_at: string }[];
+    agentChats: { created_at: string; role: string }[];
 }
 
 function generateTimeSeries(
@@ -282,6 +359,8 @@ function generateTimeSeries(
         friendRequests: number;
         groups: number;
         invites: number;
+        agents: number;
+        agentChats: number;
     }[] = [];
 
     let current = new Date(startDate);
@@ -342,6 +421,11 @@ function generateTimeSeries(
             friendRequests: countInRange(data.friendRequests, "created_at"),
             groups: countInRange(data.groups, "created_at"),
             invites: countInRange(data.invites, "used_at"),
+            agents: countInRange(data.agents, "created_at"),
+            agentChats: data.agentChats.filter(c => {
+                const itemDate = new Date(c.created_at);
+                return itemDate >= current && itemDate < nextDate && c.role === "user";
+            }).length,
         });
 
         current = nextDate;
