@@ -133,96 +133,111 @@ export default function UsersPage() {
         if (users.length === 0 || isResolvingRef.current) return;
 
         const resolveENS = async () => {
+            if (isResolvingRef.current) return; // Already resolving
             isResolvingRef.current = true;
 
-            const client = createPublicClient({
-                chain: mainnet,
-                transport: http(),
-            });
-
-            const addressesToResolve = users
-                .filter((u) => !u.ens_name) // Only resolve if not already in DB
-                .map((u) => u.wallet_address.toLowerCase())
-                .filter((addr) => {
-                    // Skip if already resolved or pending
-                    if (resolvedENS.has(addr)) return false;
-                    if (pendingResolutions.current.has(addr)) return false;
-                    return true;
+            try {
+                const client = createPublicClient({
+                    chain: mainnet,
+                    transport: http(),
                 });
 
-            if (addressesToResolve.length === 0) {
-                isResolvingRef.current = false;
-                return;
-            }
+                const addressesToResolve = users
+                    .filter((u) => !u.ens_name) // Only resolve if not already in DB
+                    .map((u) => u.wallet_address.toLowerCase())
+                    .filter((addr) => {
+                        // Skip if already resolved or pending
+                        if (resolvedENS.has(addr)) return false;
+                        if (pendingResolutions.current.has(addr)) return false;
+                        return true;
+                    });
 
-            // Mark as pending
-            addressesToResolve.forEach((addr) =>
-                pendingResolutions.current.add(addr)
-            );
+                if (addressesToResolve.length === 0) {
+                    isResolvingRef.current = false;
+                    return;
+                }
 
-            // Resolve in batches of 5 to avoid rate limits
-            const batchSize = 5;
-            const newResolutions = new Map<string, CachedENS>();
-
-            for (let i = 0; i < addressesToResolve.length; i += batchSize) {
-                const batch = addressesToResolve.slice(i, i + batchSize);
-
-                await Promise.all(
-                    batch.map(async (addr) => {
-                        try {
-                            const name = await client.getEnsName({
-                                address: addr as `0x${string}`,
-                            });
-                            let avatar: string | null = null;
-
-                            if (name) {
-                                try {
-                                    avatar = await client.getEnsAvatar({
-                                        name: normalize(name),
-                                    });
-                                } catch {
-                                    // Avatar fetch failed, continue without it
-                                }
-                            }
-
-                            const cached: CachedENS = {
-                                name,
-                                avatar,
-                                timestamp: Date.now(),
-                            };
-                            newResolutions.set(addr, cached);
-                        } catch {
-                            // Cache null result to avoid repeated failures
-                            const cached: CachedENS = {
-                                name: null,
-                                avatar: null,
-                                timestamp: Date.now(),
-                            };
-                            newResolutions.set(addr, cached);
-                        } finally {
-                            pendingResolutions.current.delete(addr);
-                        }
-                    })
+                // Mark as pending
+                addressesToResolve.forEach((addr) =>
+                    pendingResolutions.current.add(addr)
                 );
 
-                // Small delay between batches
-                if (i + batchSize < addressesToResolve.length) {
-                    await new Promise((r) => setTimeout(r, 200));
+                // Resolve in batches of 5 to avoid rate limits
+                const batchSize = 5;
+                const newResolutions = new Map<string, CachedENS>();
+
+                for (let i = 0; i < addressesToResolve.length; i += batchSize) {
+                    const batch = addressesToResolve.slice(i, i + batchSize);
+
+                    await Promise.all(
+                        batch.map(async (addr) => {
+                            try {
+                                // Wrap in try-catch to handle ContractFunctionExecutionError
+                                let name: string | null = null;
+                                try {
+                                    name = await client.getEnsName({
+                                        address: addr as `0x${string}`,
+                                    });
+                                } catch (ensError) {
+                                    // ContractFunctionExecutionError from ENS resolver - silently skip
+                                    console.debug("[ENS] Resolution failed for", addr, ensError);
+                                    name = null;
+                                }
+
+                                let avatar: string | null = null;
+
+                                if (name) {
+                                    try {
+                                        avatar = await client.getEnsAvatar({
+                                            name: normalize(name),
+                                        });
+                                    } catch {
+                                        // Avatar fetch failed, continue without it
+                                    }
+                                }
+
+                                const cached: CachedENS = {
+                                    name,
+                                    avatar,
+                                    timestamp: Date.now(),
+                                };
+                                newResolutions.set(addr, cached);
+                            } catch (outerError) {
+                                // Cache null result to avoid repeated failures
+                                console.debug("[ENS] Outer error for", addr, outerError);
+                                const cached: CachedENS = {
+                                    name: null,
+                                    avatar: null,
+                                    timestamp: Date.now(),
+                                };
+                                newResolutions.set(addr, cached);
+                            } finally {
+                                pendingResolutions.current.delete(addr);
+                            }
+                        })
+                    );
+
+                    // Small delay between batches
+                    if (i + batchSize < addressesToResolve.length) {
+                        await new Promise((r) => setTimeout(r, 200));
+                    }
                 }
-            }
 
-            // Batch update state once
-            if (newResolutions.size > 0) {
-                setResolvedENS((prev) => {
-                    const updated = new Map(prev);
-                    newResolutions.forEach((v, k) => updated.set(k, v));
-                    // Save to localStorage
-                    saveENSCache(updated);
-                    return updated;
-                });
+                // Batch update state once
+                if (newResolutions.size > 0) {
+                    setResolvedENS((prev) => {
+                        const updated = new Map(prev);
+                        newResolutions.forEach((v, k) => updated.set(k, v));
+                        // Save to localStorage
+                        saveENSCache(updated);
+                        return updated;
+                    });
+                }
+            } catch (error) {
+                console.error("[ENS] Resolution batch error:", error);
+            } finally {
+                isResolvingRef.current = false;
             }
-
-            isResolvingRef.current = false;
         };
 
         resolveENS();
