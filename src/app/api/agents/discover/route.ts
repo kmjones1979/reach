@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
                 avatar_emoji,
                 visibility,
                 message_count,
+                tags,
                 created_at
             `)
             .neq("owner_address", normalizedAddress) // Don't show own agents
@@ -93,9 +94,11 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // Apply search filter
+        // Apply search filter (name, personality, and tags)
         if (search) {
-            query = query.or(`name.ilike.%${search}%,personality.ilike.%${search}%`);
+            const searchLower = search.toLowerCase();
+            // Search in name, personality, and tags array
+            query = query.or(`name.ilike.%${search}%,personality.ilike.%${search}%,tags.cs.["${searchLower}"]`);
         }
 
         const { data: agents, error } = await query;

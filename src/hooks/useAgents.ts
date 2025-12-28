@@ -38,6 +38,8 @@ export type Agent = {
     message_count: number;
     created_at: string;
     updated_at: string;
+    // Tags for searchability (max 5)
+    tags?: string[];
     // x402 payment configuration
     x402_enabled?: boolean;
     x402_price_cents?: number;
@@ -97,7 +99,8 @@ export function useAgents(userAddress: string | null) {
         name: string,
         personality?: string,
         avatarEmoji?: string,
-        visibility?: "private" | "friends" | "public"
+        visibility?: "private" | "friends" | "public",
+        tags?: string[]
     ): Promise<Agent | null> => {
         if (!userAddress) return null;
 
@@ -111,6 +114,7 @@ export function useAgents(userAddress: string | null) {
                     personality,
                     avatarEmoji,
                     visibility,
+                    tags,
                 }),
             });
 
@@ -138,8 +142,16 @@ export function useAgents(userAddress: string | null) {
             personality?: string;
             avatarEmoji?: string;
             visibility?: "private" | "friends" | "public";
+            tags?: string[];
             webSearchEnabled?: boolean;
             useKnowledgeBase?: boolean;
+            x402Enabled?: boolean;
+            x402PriceCents?: number;
+            x402Network?: "base" | "base-sepolia";
+            x402WalletAddress?: string;
+            x402PricingMode?: "global" | "per_tool";
+            mcpServers?: MCPServer[];
+            apiTools?: APITool[];
         }
     ): Promise<Agent | null> => {
         if (!userAddress) return null;

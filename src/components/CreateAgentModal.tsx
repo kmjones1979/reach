@@ -66,17 +66,47 @@ const AGENT_TEMPLATES = [
 interface CreateAgentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onCreate: (name: string, personality: string, emoji: string, visibility: "private" | "friends" | "public") => Promise<void>;
+    onCreate: (name: string, personality: string, emoji: string, visibility: "private" | "friends" | "public", tags: string[]) => Promise<void>;
 }
+
+// Popular tag suggestions
+const TAG_SUGGESTIONS = [
+    "coding", "writing", "research", "math", "creative", "productivity",
+    "learning", "fitness", "finance", "health", "gaming", "music",
+    "art", "science", "business", "education", "assistant", "fun",
+];
 
 export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModalProps) {
     const [name, setName] = useState("");
     const [personality, setPersonality] = useState("");
     const [emoji, setEmoji] = useState("🤖");
     const [visibility, setVisibility] = useState<"private" | "friends" | "public">("private");
+    const [tags, setTags] = useState<string[]>([]);
+    const [tagInput, setTagInput] = useState("");
     const [isCreating, setIsCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showTemplates, setShowTemplates] = useState(true);
+
+    const addTag = (tag: string) => {
+        const normalizedTag = tag.trim().toLowerCase();
+        if (normalizedTag && !tags.includes(normalizedTag) && tags.length < 5) {
+            setTags([...tags, normalizedTag]);
+            setTagInput("");
+        }
+    };
+
+    const removeTag = (tagToRemove: string) => {
+        setTags(tags.filter(t => t !== tagToRemove));
+    };
+
+    const handleTagKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addTag(tagInput);
+        } else if (e.key === "Backspace" && !tagInput && tags.length > 0) {
+            setTags(tags.slice(0, -1));
+        }
+    };
 
     const applyTemplate = (template: typeof AGENT_TEMPLATES[0]) => {
         setName(template.name);
@@ -95,9 +125,11 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
         setError(null);
 
         try {
-            await onCreate(name.trim(), personality.trim(), emoji, visibility);
+            await onCreate(name.trim(), personality.trim(), emoji, visibility, tags);
             // Reset form
             setName("");
+            setTags([]);
+            setTagInput("");
             setPersonality("");
             setEmoji("🤖");
             setVisibility("private");
@@ -115,6 +147,8 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
         setPersonality("");
         setEmoji("🤖");
         setVisibility("private");
+        setTags([]);
+        setTagInput("");
         setShowTemplates(true);
         setError(null);
         onClose();
@@ -313,6 +347,61 @@ export function CreateAgentModal({ isOpen, onClose, onCreate }: CreateAgentModal
                                     {visibility === "public" && "Anyone can discover and use this agent"}
                                 </p>
                             </div>
+
+                            {/* Tags */}
+                            {(visibility === "friends" || visibility === "public") && (
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-300 mb-2">
+                                        Tags <span className="text-zinc-500 font-normal">({tags.length}/5)</span>
+                                    </label>
+                                    <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-2 focus-within:border-purple-500 transition-colors">
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {tags.map(tag => (
+                                                <span
+                                                    key={tag}
+                                                    className="inline-flex items-center gap-1 px-2 py-1 bg-purple-500/20 text-purple-400 rounded-lg text-sm"
+                                                >
+                                                    #{tag}
+                                                    <button
+                                                        onClick={() => removeTag(tag)}
+                                                        className="hover:text-purple-300"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={tagInput}
+                                            onChange={(e) => setTagInput(e.target.value.slice(0, 20))}
+                                            onKeyDown={handleTagKeyDown}
+                                            placeholder={tags.length < 5 ? "Add tags (press Enter)" : "Max tags reached"}
+                                            disabled={tags.length >= 5}
+                                            className="w-full bg-transparent text-white placeholder-zinc-500 focus:outline-none text-sm disabled:opacity-50"
+                                        />
+                                    </div>
+                                    {/* Tag suggestions */}
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {TAG_SUGGESTIONS
+                                            .filter(t => !tags.includes(t))
+                                            .slice(0, 8)
+                                            .map(suggestion => (
+                                                <button
+                                                    key={suggestion}
+                                                    onClick={() => addTag(suggestion)}
+                                                    disabled={tags.length >= 5}
+                                                    className="px-2 py-0.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    +{suggestion}
+                                                </button>
+                                            ))}
+                                    </div>
+                                    <p className="text-xs text-zinc-500 mt-2">
+                                        Tags help users find your agent when searching
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Actions */}

@@ -72,6 +72,8 @@ export async function PATCH(
             visibility, 
             webSearchEnabled, 
             useKnowledgeBase,
+            // Tags for searchability
+            tags,
             // x402 fields
             x402Enabled,
             x402PriceCents,
@@ -117,6 +119,17 @@ export async function PATCH(
         if (visibility !== undefined) updates.visibility = visibility;
         if (webSearchEnabled !== undefined) updates.web_search_enabled = webSearchEnabled;
         if (useKnowledgeBase !== undefined) updates.use_knowledge_base = useKnowledgeBase;
+        
+        // Tags (max 5, each max 20 chars)
+        if (tags !== undefined) {
+            const validatedTags = Array.isArray(tags) 
+                ? tags
+                    .slice(0, 5)
+                    .map((t: string) => t.trim().toLowerCase().slice(0, 20))
+                    .filter((t: string) => t.length > 0)
+                : [];
+            updates.tags = validatedTags;
+        }
         
         // x402 configuration updates
         if (x402Enabled !== undefined) updates.x402_enabled = x402Enabled;

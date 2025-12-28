@@ -65,13 +65,22 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { userAddress, name, personality, avatarEmoji, visibility } = body;
+        const { userAddress, name, personality, avatarEmoji, visibility, tags } = body;
 
         if (!userAddress || !name) {
             return NextResponse.json(
                 { error: "User address and name are required" },
                 { status: 400 }
             );
+        }
+
+        // Validate tags (max 5, each max 20 chars)
+        let validatedTags: string[] = [];
+        if (tags && Array.isArray(tags)) {
+            validatedTags = tags
+                .slice(0, 5) // Max 5 tags
+                .map((t: string) => t.trim().toLowerCase().slice(0, 20)) // Normalize and limit length
+                .filter((t: string) => t.length > 0); // Remove empty
         }
 
         const normalizedAddress = userAddress.toLowerCase();
@@ -119,6 +128,7 @@ export async function POST(request: NextRequest) {
                 model: "gemini-1.5-flash", // Use 1.5-flash for better free tier limits
                 avatar_emoji: avatarEmoji || "🤖",
                 visibility: visibility || "private",
+                tags: validatedTags,
             })
             .select()
             .single();

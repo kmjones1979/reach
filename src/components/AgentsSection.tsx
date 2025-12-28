@@ -29,9 +29,10 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
         name: string,
         personality: string,
         emoji: string,
-        visibility: "private" | "friends" | "public"
+        visibility: "private" | "friends" | "public",
+        tags: string[]
     ) => {
-        await createAgent(name, personality, emoji, visibility);
+        await createAgent(name, personality, emoji, visibility, tags);
     };
 
     const handleDeleteAgent = async (agent: Agent) => {

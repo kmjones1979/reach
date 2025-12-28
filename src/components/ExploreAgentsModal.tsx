@@ -195,6 +195,19 @@ export function ExploreAgentsModal({
                                                     <p className="text-sm text-zinc-400 line-clamp-2 mb-2">
                                                         {agent.personality || "An AI assistant"}
                                                     </p>
+                                                    {/* Tags */}
+                                                    {agent.tags && agent.tags.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mb-2">
+                                                            {agent.tags.slice(0, 5).map(tag => (
+                                                                <span
+                                                                    key={tag}
+                                                                    className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded"
+                                                                >
+                                                                    #{tag}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                     <div className="flex items-center gap-3 text-xs text-zinc-500">
                                                         <span>by {formatOwnerName(agent)}</span>
                                                         <span>•</span>
