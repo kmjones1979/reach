@@ -623,14 +623,8 @@ export function WakuProvider({
         async (address: string): Promise<boolean> => {
             // Waku is a broadcast network, any address can receive messages
             // As long as they subscribe to the right content topic
-            if (!address.startsWith("0x")) {
-                console.log(
-                    "[Waku] canMessage: Non-EVM address not supported:",
-                    address
-                );
-                return false;
-            }
-            return true;
+            // Works with both EVM (0x...) and Solana (base58) addresses
+            return Boolean(address && address.length > 0);
         },
         []
     );
@@ -640,7 +634,10 @@ export function WakuProvider({
         async (addresses: string[]): Promise<Record<string, boolean>> => {
             const result: Record<string, boolean> = {};
             for (const addr of addresses) {
-                result[addr.toLowerCase()] = addr.startsWith("0x");
+                // Waku supports any address format - both EVM and Solana
+                // Use original case for Solana addresses (case-sensitive)
+                const key = addr.startsWith("0x") ? addr.toLowerCase() : addr;
+                result[key] = Boolean(addr && addr.length > 0);
             }
             return result;
         },
