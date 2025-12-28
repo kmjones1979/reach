@@ -164,33 +164,28 @@ export function ChatModal({
         if (!isOpen || !isInitialized) return;
 
         const loadMessages = async () => {
-            setChatState("checking");
+            // Skip "checking" state - go straight to loading for faster UX
+            // Waku's canMessage always returns true for valid addresses
+            setChatState("loading");
+            setChatError(null);
 
             try {
-                // Check if peer can receive messages (unless bypassed)
+                // Quick check in background (non-blocking)
                 if (!bypassCheck) {
-                    const canChat = await canMessage(peerAddress);
-                    console.log(
-                        "[Chat] canMessage result for",
-                        peerAddress,
-                        ":",
-                        canChat
-                    );
-                    if (!canChat) {
-                        setChatState("error");
-                        setChatError(
-                            `${displayName} hasn't enabled chat yet. They need to click "Enable Chat" in Spritz first.`
-                        );
-                        return;
-                    }
+                    canMessage(peerAddress).then(canChat => {
+                        if (!canChat) {
+                            setChatState("error");
+                            setChatError(
+                                `${displayName} hasn't enabled chat yet. They need to click "Enable Chat" in Spritz first.`
+                            );
+                        }
+                    });
                 }
 
-                setChatState("loading");
-                setChatError(null);
-
-                // Try to load existing messages (with timeout protection in provider)
+                // Load messages immediately (may be from cache)
                 console.log("[Chat] Loading messages for", peerAddress);
                 try {
+                    // First load from cache (fast), then refresh in background
                     const existingMessages = await getMessages(peerAddress);
                     console.log(
                         "[Chat] Got messages:",

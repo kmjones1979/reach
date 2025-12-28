@@ -346,6 +346,7 @@ type WakuContextType = {
     markAsRead: (peerAddress: string) => void;
     setActiveChatPeer: (peerAddress: string | null) => void;
     onNewMessage: (callback: NewMessageCallback) => () => void;
+    prefetchMessages: (peerAddress: string) => void;
     close: () => void;
     // Group methods
     createGroup: (
@@ -1016,6 +1017,24 @@ export function WakuProvider({
         },
         [userAddress, getDmSymmetricKey]
     );
+
+    // Prefetch messages for a conversation (non-blocking, for notification pre-loading)
+    const prefetchMessages = useCallback((peerAddress: string) => {
+        if (!userAddress || !peerAddress) return;
+        
+        // Don't prefetch if chat is already open for this peer
+        if (activeChatPeerRef.current?.toLowerCase() === peerAddress.toLowerCase()) {
+            return;
+        }
+
+        console.log("[Waku] Prefetching messages for", peerAddress);
+        
+        // Fire and forget - don't await, just trigger the fetch in background
+        // This will populate the cache so when chat opens, messages are ready
+        getMessages(peerAddress, true).catch(err => {
+            console.log("[Waku] Prefetch failed (non-critical):", err);
+        });
+    }, [userAddress, getMessages]);
 
     // Stream messages from a DM conversation
     const streamMessages = useCallback(
@@ -2299,6 +2318,7 @@ export function WakuProvider({
                 markAsRead,
                 setActiveChatPeer,
                 onNewMessage,
+                prefetchMessages,
                 close,
                 // Group methods
                 createGroup,

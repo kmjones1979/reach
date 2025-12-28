@@ -497,6 +497,7 @@ function DashboardContent({
     const initializeWaku = wakuContext?.initialize ?? (() => Promise.resolve());
     const markAsRead = wakuContext?.markAsRead ?? (() => {});
     const onNewMessage = wakuContext?.onNewMessage ?? (() => () => {});
+    const prefetchMessages = wakuContext?.prefetchMessages ?? (() => {});
     const canMessageBatch =
         wakuContext?.canMessageBatch ??
         (() => Promise.resolve({} as Record<string, boolean>));
@@ -1065,6 +1066,10 @@ function DashboardContent({
         if (!isWakuInitialized) return;
 
         const unsubscribe = onNewMessage(({ senderAddress, content }) => {
+            // Pre-fetch all messages for this conversation in background
+            // This way when user clicks the toast, messages are already loaded
+            prefetchMessages(senderAddress);
+            
             // Find friend info for the sender
             const friend = friendsListData.find(
                 (f) => f.address.toLowerCase() === senderAddress.toLowerCase()
@@ -1098,6 +1103,7 @@ function DashboardContent({
     }, [
         isWakuInitialized,
         onNewMessage,
+        prefetchMessages,
         friendsListData,
         notifyMessage,
         userSettings.soundEnabled,
