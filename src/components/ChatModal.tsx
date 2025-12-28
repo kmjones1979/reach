@@ -28,8 +28,8 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 type ChatModalProps = {
     isOpen: boolean;
     onClose: () => void;
-    userAddress: Address;
-    peerAddress: Address;
+    userAddress: string; // Can be EVM or Solana address
+    peerAddress: string; // Can be EVM or Solana address
     peerName?: string | null;
     peerAvatar?: string | null;
 };

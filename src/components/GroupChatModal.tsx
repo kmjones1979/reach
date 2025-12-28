@@ -19,7 +19,7 @@ type Friend = {
 interface GroupChatModalProps {
     isOpen: boolean;
     onClose: () => void;
-    userAddress: Address;
+    userAddress: string; // Can be EVM or Solana address
     group: XMTPGroup | null;
     friends?: Friend[];
     onGroupDeleted?: () => void;

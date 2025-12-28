@@ -486,9 +486,8 @@ function DashboardContent({
         clearRemoteHangup,
     } = useCallSignaling(userAddress);
 
-    // Waku is only available for EVM users (not Solana)
-    // Use a safe wrapper that returns defaults for Solana users
-    const wakuContext = isSolanaUser ? null : useXMTPContext();
+    // Waku works with both EVM and Solana addresses
+    const wakuContext = useXMTPContext();
 
     const isWakuInitialized = wakuContext?.isInitialized ?? false;
     const isWakuInitializing = wakuContext?.isInitializing ?? false;
@@ -559,11 +558,8 @@ function DashboardContent({
         Record<string, boolean>
     >({});
 
-    // Auto-initialize Waku after a short delay (EVM users only)
+    // Auto-initialize Waku after a short delay
     useEffect(() => {
-        // Skip for Solana users - Waku not supported
-        if (isSolanaUser) return;
-
         if (
             !isWakuInitialized &&
             !isWakuInitializing &&
@@ -576,18 +572,18 @@ function DashboardContent({
             }, 1500);
             return () => clearTimeout(timer);
         }
-    }, [isSolanaUser, isWakuInitialized, isWakuInitializing, initializeWaku]);
+    }, [isWakuInitialized, isWakuInitializing, initializeWaku]);
 
-    // Show Waku success message briefly when initialized (EVM users only)
+    // Show Waku success message briefly when initialized
     useEffect(() => {
-        if (isWakuInitialized && !isPasskeyUser && !isSolanaUser) {
+        if (isWakuInitialized && !isPasskeyUser) {
             setShowWakuSuccess(true);
             const timer = setTimeout(() => {
                 setShowWakuSuccess(false);
             }, 4000); // Hide after 4 seconds
             return () => clearTimeout(timer);
         }
-    }, [isWakuInitialized, isPasskeyUser, isSolanaUser]);
+    }, [isWakuInitialized, isPasskeyUser]);
 
     // Handler to switch to mainnet
     const handleSwitchToMainnet = async () => {
@@ -662,7 +658,7 @@ function DashboardContent({
     // Open chat from URL parameter (e.g., ?chat=0x123...)
     // This is used when clicking a push notification
     useEffect(() => {
-        if (typeof window === "undefined" || isSolanaUser) return;
+        if (typeof window === "undefined") return;
 
         const urlParams = new URLSearchParams(window.location.search);
         const chatAddress = urlParams.get("chat");
@@ -685,11 +681,11 @@ function DashboardContent({
                 window.history.replaceState({}, "", newUrl);
             }
         }
-    }, [friendsListData, isSolanaUser]);
+    }, [friendsListData]);
 
     // Listen for service worker messages to open chat
     useEffect(() => {
-        if (typeof window === "undefined" || isSolanaUser) return;
+        if (typeof window === "undefined") return;
 
         const handleServiceWorkerMessage = (event: MessageEvent) => {
             if (event.data?.type === "OPEN_CHAT" && event.data.senderAddress) {
@@ -722,11 +718,11 @@ function DashboardContent({
                 handleServiceWorkerMessage
             );
         };
-    }, [friendsListData, isSolanaUser]);
+    }, [friendsListData]);
 
-    // Check which friends can receive Waku messages (EVM users only)
+    // Check which friends can receive Waku messages
     useEffect(() => {
-        if (isPasskeyUser || isSolanaUser || friends.length === 0) {
+        if (isPasskeyUser || friends.length === 0) {
             return;
         }
 
@@ -737,7 +733,7 @@ function DashboardContent({
         };
 
         checkFriendsWaku();
-    }, [friends, isPasskeyUser, isSolanaUser, canMessageBatch]);
+    }, [friends, isPasskeyUser, canMessageBatch]);
 
     // Sync friends count for analytics
     useEffect(() => {
@@ -746,9 +742,9 @@ function DashboardContent({
         }
     }, [friends.length, syncFriendsCount]);
 
-    // Load groups when Waku is initialized (EVM users only)
+    // Load groups when Waku is initialized
     useEffect(() => {
-        if (!isWakuInitialized || isPasskeyUser || isSolanaUser) return;
+        if (!isWakuInitialized || isPasskeyUser) return;
 
         const loadGroups = async () => {
             setIsLoadingGroups(true);
@@ -763,7 +759,7 @@ function DashboardContent({
         };
 
         loadGroups();
-    }, [isWakuInitialized, isPasskeyUser, isSolanaUser, getGroups]);
+    }, [isWakuInitialized, isPasskeyUser, getGroups]);
 
     // Sync groups count for analytics
     useEffect(() => {
@@ -1053,9 +1049,9 @@ function DashboardContent({
         rejectCall,
     ]);
 
-    // Listen for new messages and show toast + notification (EVM users only)
+    // Listen for new messages and show toast + notification
     useEffect(() => {
-        if (!isWakuInitialized || isSolanaUser) return;
+        if (!isWakuInitialized) return;
 
         const unsubscribe = onNewMessage(({ senderAddress, content }) => {
             // Find friend info for the sender
@@ -2531,8 +2527,8 @@ function DashboardContent({
                         </motion.div>
                     )}
 
-                    {/* Waku Status Banner - hidden for passkey users and Solana users */}
-                    {!isWakuInitialized && !isPasskeyUser && !isSolanaUser && (
+                    {/* Waku Status Banner - hidden for passkey users */}
+                    {!isWakuInitialized && !isPasskeyUser && (
                         <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -2861,11 +2857,11 @@ function DashboardContent({
                                 onRemove={handleRemoveFriend}
                                 isCallActive={callState !== "idle"}
                                 unreadCounts={
-                                    isPasskeyUser || isSolanaUser
+                                    isPasskeyUser
                                         ? {}
                                         : unreadCounts
                                 }
-                                hideChat={isPasskeyUser || isSolanaUser}
+                                hideChat={isPasskeyUser}
                                 friendsWakuStatus={friendsWakuStatus}
                             />
                         </div>
@@ -2874,7 +2870,6 @@ function DashboardContent({
                     {/* Group Invitations Section */}
                     {isWakuInitialized &&
                         !isPasskeyUser &&
-                        !isSolanaUser &&
                         pendingInvitations.length > 0 && (
                             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6 p-6">
                                 <GroupInvitations
@@ -2900,8 +2895,8 @@ function DashboardContent({
                             </div>
                         )}
 
-                    {/* Groups Section - Only show if Waku is enabled (EVM users only) */}
-                    {isWakuInitialized && !isPasskeyUser && !isSolanaUser && (
+                    {/* Groups Section - Only show if Waku is enabled */}
+                    {isWakuInitialized && !isPasskeyUser && (
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6">
                             <div className="p-6 border-b border-zinc-800">
                                 <div className="flex items-center justify-between">
@@ -3017,8 +3012,8 @@ function DashboardContent({
                         </div>
                     )}
 
-                    {/* Community Section - For users without Waku (passkey/solana users) */}
-                    {(!isWakuInitialized || isPasskeyUser || isSolanaUser) && (
+                    {/* Community Section - For users without Waku (passkey users) */}
+                    {(!isWakuInitialized || isPasskeyUser) && (
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6">
                             <div className="p-6 border-b border-zinc-800">
                                 <h2 className="text-xl font-bold text-white">
@@ -3199,13 +3194,13 @@ function DashboardContent({
                     )}
             </AnimatePresence>
 
-            {/* Chat Modal - EVM users only */}
-            {!isSolanaUser && evmAddress && (
+            {/* Chat Modal */}
+            {userAddress && (
                 <ChatModal
                     isOpen={!!chatFriend}
                     onClose={() => setChatFriend(null)}
-                    userAddress={evmAddress}
-                    peerAddress={chatFriend?.address || ("0x" as Address)}
+                    userAddress={userAddress}
+                    peerAddress={chatFriend?.address || ""}
                     peerName={chatFriend?.ensName || chatFriend?.nickname}
                     peerAvatar={chatFriend?.avatar}
                 />
@@ -3327,12 +3322,12 @@ function DashboardContent({
                 isCreating={isCreatingGroup}
             />
 
-            {/* Group Chat Modal - EVM users only */}
-            {!isSolanaUser && evmAddress && (
+            {/* Group Chat Modal */}
+            {userAddress && (
                 <GroupChatModal
                     isOpen={!!selectedGroup}
                     onClose={() => setSelectedGroup(null)}
-                    userAddress={evmAddress}
+                    userAddress={userAddress}
                     group={selectedGroup}
                     friends={friendsListData}
                     onGroupDeleted={async () => {
