@@ -15,7 +15,7 @@ interface AgentsSectionProps {
 
 export function AgentsSection({ userAddress }: AgentsSectionProps) {
     const { agents, isLoading, error, createAgent, updateAgent, deleteAgent } = useAgents(userAddress);
-    const { favorites, removeFavorite } = useFavoriteAgents(userAddress);
+    const { favorites, removeFavorite, refresh: refreshFavorites } = useFavoriteAgents(userAddress);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isKnowledgeModalOpen, setIsKnowledgeModalOpen] = useState(false);
@@ -412,7 +412,11 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
             />
             <ExploreAgentsModal
                 isOpen={isExploreModalOpen}
-                onClose={() => setIsExploreModalOpen(false)}
+                onClose={() => {
+                    setIsExploreModalOpen(false);
+                    // Refresh favorites to sync any changes made in the modal
+                    refreshFavorites();
+                }}
                 userAddress={userAddress}
                 onSelectAgent={handleSelectDiscoveredAgent}
             />
