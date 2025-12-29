@@ -3131,10 +3131,10 @@ function DashboardContent({
                     </AnimatePresence>
                 </main>
 
-                {/* Bottom Navigation Bar - Telegram Style */}
-                <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-lg border-t border-zinc-800 safe-area-pb z-50">
-                    <div className="max-w-4xl mx-auto px-2">
-                        <div className="flex items-center justify-around py-2">
+                {/* Bottom Navigation Bar - Floating Pill Style */}
+                <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 safe-area-pb">
+                    <div className="bg-zinc-900/70 backdrop-blur-xl border border-zinc-700/50 rounded-2xl shadow-2xl shadow-black/50 px-2">
+                        <div className="flex items-center gap-1 py-2">
                             {/* Agents Tab */}
                             {hasBetaAccess && (
                                 <button
@@ -3142,14 +3142,14 @@ function DashboardContent({
                                         setActiveNavTab("agents");
                                         document.getElementById("agents-section")?.scrollIntoView({ behavior: "smooth" });
                                     }}
-                                    className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
+                                    className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
                                         activeNavTab === "agents"
-                                            ? "text-purple-400 bg-purple-500/10"
-                                            : "text-zinc-500 hover:text-zinc-300"
+                                            ? "text-purple-400 bg-purple-500/20"
+                                            : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                                     }`}
                                 >
-                                    <span className="text-xl">✨</span>
-                                    <span className="text-xs font-medium">Agents</span>
+                                    <span className="text-lg">✨</span>
+                                    <span className="text-[10px] font-medium">Agents</span>
                                 </button>
                             )}
 
@@ -3159,34 +3159,33 @@ function DashboardContent({
                                     setActiveNavTab("friends");
                                     document.getElementById("friends-section")?.scrollIntoView({ behavior: "smooth" });
                                 }}
-                                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
+                                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
                                     activeNavTab === "friends"
-                                        ? "text-orange-400 bg-orange-500/10"
-                                        : "text-zinc-500 hover:text-zinc-300"
+                                        ? "text-orange-400 bg-orange-500/20"
+                                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                                 }`}
                             >
-                                <span className="text-xl">👥</span>
-                                <span className="text-xs font-medium">Friends</span>
+                                <span className="text-lg">👥</span>
+                                <span className="text-[10px] font-medium">Friends</span>
                             </button>
 
                             {/* Chats Tab */}
                             <button
                                 onClick={() => {
                                     setActiveNavTab("chats");
-                                    // For now, scroll to friends section where chats are
                                     document.getElementById("friends-section")?.scrollIntoView({ behavior: "smooth" });
                                 }}
-                                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all relative ${
+                                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all relative ${
                                     activeNavTab === "chats"
-                                        ? "text-blue-400 bg-blue-500/10"
-                                        : "text-zinc-500 hover:text-zinc-300"
+                                        ? "text-blue-400 bg-blue-500/20"
+                                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                                 }`}
                             >
-                                <span className="text-xl">💬</span>
-                                <span className="text-xs font-medium">Chats</span>
+                                <span className="text-lg">💬</span>
+                                <span className="text-[10px] font-medium">Chats</span>
                                 {/* Unread indicator */}
                                 {unreadCounts && Object.values(unreadCounts).some(c => c > 0) && (
-                                    <span className="absolute top-1 right-2 w-2 h-2 bg-blue-500 rounded-full" />
+                                    <span className="absolute top-0.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                                 )}
                             </button>
 
@@ -3194,17 +3193,16 @@ function DashboardContent({
                             <button
                                 onClick={() => {
                                     setActiveNavTab("calls");
-                                    // Scroll to friends where call buttons are
                                     document.getElementById("friends-section")?.scrollIntoView({ behavior: "smooth" });
                                 }}
-                                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
+                                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
                                     activeNavTab === "calls"
-                                        ? "text-green-400 bg-green-500/10"
-                                        : "text-zinc-500 hover:text-zinc-300"
+                                        ? "text-green-400 bg-green-500/20"
+                                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                                 }`}
                             >
-                                <span className="text-xl">📞</span>
-                                <span className="text-xs font-medium">Calls</span>
+                                <span className="text-lg">📞</span>
+                                <span className="text-[10px] font-medium">Calls</span>
                             </button>
 
                             {/* Settings Tab */}
@@ -3213,21 +3211,21 @@ function DashboardContent({
                                     setActiveNavTab("settings");
                                     setIsSettingsModalOpen(true);
                                 }}
-                                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${
+                                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
                                     activeNavTab === "settings"
-                                        ? "text-zinc-300 bg-zinc-700/50"
-                                        : "text-zinc-500 hover:text-zinc-300"
+                                        ? "text-zinc-200 bg-zinc-700/50"
+                                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                                 }`}
                             >
-                                <span className="text-xl">⚙️</span>
-                                <span className="text-xs font-medium">Settings</span>
+                                <span className="text-lg">⚙️</span>
+                                <span className="text-[10px] font-medium">Settings</span>
                             </button>
                         </div>
                     </div>
                 </nav>
 
-                {/* Spacer for bottom nav */}
-                <div className="h-20 safe-area-pb" />
+                {/* Spacer for floating bottom nav */}
+                <div className="h-24" />
             </div>
 
             {/* Add Friend Modal */}
