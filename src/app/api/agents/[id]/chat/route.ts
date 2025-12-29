@@ -342,19 +342,28 @@ export async function POST(
                         const headers: Record<string, string> = {
                             "Content-Type": "application/json",
                             "Accept": "application/json, text/event-stream",
-                            ...(server.headers || {})
                         };
                         
-                        // Add API key if present
+                        // Add server-configured headers
+                        if (server.headers) {
+                            for (const [key, value] of Object.entries(server.headers)) {
+                                headers[key] = String(value);
+                            }
+                        }
+                        
+                        // Add API key - for Context7, try both header styles
                         if (server.apiKey) {
                             // Check if there's already an auth header configured
                             const hasAuthHeader = Object.keys(headers).some(k => 
-                                k.toLowerCase() === "authorization" || k.toLowerCase().includes("api_key") || k.toLowerCase().includes("apikey")
+                                k.toLowerCase() === "authorization"
                             );
                             if (!hasAuthHeader) {
+                                // Context7 expects Bearer token in Authorization header
                                 headers["Authorization"] = `Bearer ${server.apiKey}`;
                             }
                         }
+                        
+                        console.log(`[MCP] Headers for ${server.name}:`, Object.keys(headers));
                         
                         // For Context7-like servers, try to extract what the user is looking for
                         // First, check for common library names (prioritize these over regex)
@@ -419,23 +428,49 @@ export async function POST(
                         if (libraryName && server.url.includes("context7")) {
                             console.log(`[Chat] Context7: Resolving library ID for: ${libraryName}`);
                             
-                            // Find the resolve-library-id tool from discovered tools to get correct param names
-                            const resolveTool = availableTools.find(t => t.name === "resolve-library-id");
-                            const resolveParams: Record<string, string> = {};
-                            
-                            if (resolveTool?.inputSchema?.properties) {
-                                // Use the discovered schema to build correct parameters
-                                for (const paramName of Object.keys(resolveTool.inputSchema.properties)) {
-                                    resolveParams[paramName] = libraryName;
+                            // First, try a simple direct query format (some MCP endpoints support this)
+                            let gotResults = false;
+                            try {
+                                console.log(`[Chat] Context7: Trying simple query format first`);
+                                const simpleResponse = await fetch(server.url, {
+                                    method: "POST",
+                                    headers,
+                                    body: JSON.stringify({
+                                        query: `${libraryName} ${message}`.substring(0, 200)
+                                    })
+                                });
+                                
+                                if (simpleResponse.ok) {
+                                    const simpleData = await simpleResponse.text();
+                                    if (simpleData && simpleData.length > 100 && !simpleData.includes('"error"')) {
+                                        console.log(`[Chat] Context7: Simple query worked, got ${simpleData.length} chars`);
+                                        const truncatedSimple = simpleData.length > 10000 ? simpleData.substring(0, 10000) + "..." : simpleData;
+                                        mcpResults.push(`\n--- Documentation from ${server.name} ---\n${truncatedSimple}`);
+                                        gotResults = true;
+                                    }
                                 }
-                                console.log(`[Chat] Context7: Using discovered params:`, Object.keys(resolveParams));
-                            } else {
-                                // Fallback: send both common parameter names
-                                resolveParams.libraryName = libraryName;
-                                resolveParams.query = libraryName;
+                            } catch (e) {
+                                console.log(`[Chat] Context7: Simple query failed, trying JSON-RPC`);
                             }
                             
-                            console.log(`[Chat] Context7: Making request to ${server.url} for library: ${libraryName}`);
+                            // If simple query didn't work, try JSON-RPC format
+                            if (!gotResults) {
+                                // Find the resolve-library-id tool from discovered tools to get correct param names
+                                const resolveTool = availableTools.find(t => t.name === "resolve-library-id");
+                                const resolveParams: Record<string, string> = {};
+                                
+                                if (resolveTool?.inputSchema?.properties) {
+                                    // Use the discovered schema to build correct parameters
+                                    for (const paramName of Object.keys(resolveTool.inputSchema.properties)) {
+                                        resolveParams[paramName] = libraryName;
+                                    }
+                                    console.log(`[Chat] Context7: Using discovered params:`, Object.keys(resolveParams));
+                                } else {
+                                    // Fallback: The error said it expects 'libraryName', so use that
+                                    resolveParams.libraryName = libraryName;
+                                }
+                                
+                                console.log(`[Chat] Context7: Making JSON-RPC request to ${server.url} for library: ${libraryName}`);
                             const resolveResponse = await fetch(server.url, {
                                 method: "POST",
                                 headers,
@@ -522,6 +557,7 @@ export async function POST(
                                     mcpResults.push(`\n--- Search results from ${server.name} ---\n${truncatedResult}`);
                                 }
                             }
+                            } // End of JSON-RPC fallback
                         } else {
                             // Generic MCP call - try a simple query
                             const mcpResponse = await fetch(server.url, {
