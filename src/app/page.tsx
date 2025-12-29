@@ -49,7 +49,7 @@ function hasSavedWalletSession(): boolean {
 
 export default function Home() {
     // EVM wallet via wagmi
-    const { isReconnecting, status: wagmiStatus } = useAccount();
+    const { isReconnecting } = useAccount();
     // AppKit disconnect (works for both EVM and Solana)
     const { disconnect: walletDisconnect } = useDisconnect();
 
@@ -61,7 +61,7 @@ export default function Home() {
     } = useWalletType();
 
     // AppKit account for disconnect
-    const { isConnected: isAppKitConnected, status: appKitStatus } = useAppKitAccount();
+    const { isConnected: isAppKitConnected } = useAppKitAccount();
 
     const {
         isAuthenticated: isPasskeyAuthenticated,
@@ -111,8 +111,6 @@ export default function Home() {
     // Detect if wallet is still reconnecting (checking multiple signals)
     const isWalletReconnecting = 
         isReconnecting || 
-        wagmiStatus === "reconnecting" ||
-        appKitStatus === "reconnecting" ||
         (hasSavedSession.current && !isWalletConnected && initializing);
 
     // Auto sign-in with SIWE/SIWS when wallet connects (if not already authenticated)
