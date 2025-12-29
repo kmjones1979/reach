@@ -269,24 +269,29 @@ export async function POST(
                         }
                         
                         // For Context7-like servers, try to extract what the user is looking for
-                        // Match patterns like "docs on Next.js", "about React", "for typescript"
-                        const libraryMatch = message.match(/(?:docs?(?:umentation)?|search|looking at|about|using|for|on)\s+(?:on\s+)?([A-Za-z][A-Za-z0-9\.\-]*(?:\.js)?)/i);
-                        let libraryName = libraryMatch ? libraryMatch[1] : null;
+                        // First, check for common library names (prioritize these over regex)
+                        const commonLibs = ["next.js", "nextjs", "react", "vue", "angular", "svelte", "typescript", "node", "express", "fastify", "prisma", "drizzle", "tailwind", "supabase", "firebase", "mongodb", "postgres", "redis"];
+                        let libraryName: string | null = null;
                         
-                        // Also try to find common library names directly mentioned
+                        const messageLower = message.toLowerCase();
+                        for (const lib of commonLibs) {
+                            if (messageLower.includes(lib)) {
+                                libraryName = lib;
+                                break;
+                            }
+                        }
+                        
+                        // If no common lib found, try regex (but skip "context7" as that's the tool name)
                         if (!libraryName) {
-                            const commonLibs = ["nextjs", "next.js", "react", "vue", "angular", "svelte", "typescript", "node", "express", "fastify", "prisma", "drizzle", "tailwind"];
-                            for (const lib of commonLibs) {
-                                if (message.toLowerCase().includes(lib)) {
-                                    libraryName = lib;
-                                    break;
-                                }
+                            const libraryMatch = message.match(/(?:docs?(?:umentation)?|about|using|for)\s+(?:on\s+)?([A-Za-z][A-Za-z0-9\.\-]*(?:\.js)?)/i);
+                            if (libraryMatch && libraryMatch[1].toLowerCase() !== "context7") {
+                                libraryName = libraryMatch[1];
                             }
                         }
                         
                         // Clean up library name
                         if (libraryName) {
-                            libraryName = libraryName.replace(/\.js$/i, "").replace(/\.$/, "");
+                            libraryName = libraryName.replace(/\.$/, "");
                         }
                         
                         console.log(`[Chat] Context7: Extracted library name: ${libraryName} from message: "${message.substring(0, 100)}"`);
@@ -295,8 +300,8 @@ export async function POST(
                         if (libraryName && server.url.includes("context7")) {
                             console.log(`[Chat] Context7: Resolving library ID for: ${libraryName}`);
                             
-                            // Call resolve-library-id
-                            console.log(`[Chat] Context7: Making request to ${server.url} with headers:`, Object.keys(headers));
+                            // Call resolve-library-id (send both 'libraryName' and 'query' for compatibility)
+                            console.log(`[Chat] Context7: Making request to ${server.url} for library: ${libraryName}`);
                             const resolveResponse = await fetch(server.url, {
                                 method: "POST",
                                 headers,
@@ -306,7 +311,10 @@ export async function POST(
                                     method: "tools/call",
                                     params: {
                                         name: "resolve-library-id",
-                                        arguments: { libraryName }
+                                        arguments: { 
+                                            libraryName: libraryName,
+                                            query: libraryName  // Some versions expect 'query' instead
+                                        }
                                     }
                                 })
                             });
@@ -452,8 +460,20 @@ export async function POST(
                         const headers: Record<string, string> = {
                             "User-Agent": "SpritzAgent/1.0",
                             "Content-Type": "application/json",
-                            ...(tool.headers || {})
                         };
+                        
+                        // Add tool headers, sanitizing any invalid header names
+                        if (tool.headers) {
+                            for (const [key, value] of Object.entries(tool.headers)) {
+                                // Skip invalid header names (no colons, spaces, or empty)
+                                const sanitizedKey = key.trim();
+                                if (sanitizedKey && !sanitizedKey.includes(":") && !sanitizedKey.includes(" ")) {
+                                    headers[sanitizedKey] = String(value);
+                                } else {
+                                    console.warn(`[Chat] Skipping invalid header name: "${key}"`);
+                                }
+                            }
+                        }
                         
                         // Add API key as Authorization header if present and no auth header exists
                         if (tool.apiKey && !headers["Authorization"] && !headers["authorization"]) {
