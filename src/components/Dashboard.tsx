@@ -118,7 +118,7 @@ function DashboardContent({
     const [showSolanaBanner, setShowSolanaBanner] = useState(true);
     
     // Bottom navigation tab state - default to chats
-    type NavTab = "agents" | "friends" | "chats" | "calls" | "leaderboard" | "settings";
+    type NavTab = "agents" | "friends" | "chats" | "calls" | "leaderboard";
     const [activeNavTab, setActiveNavTab] = useState<NavTab>("chats");
     const [currentCallFriend, setCurrentCallFriend] =
         useState<FriendsListFriend | null>(null);
@@ -3378,14 +3378,11 @@ function DashboardContent({
                                 <span className="text-[10px] font-medium">Ranks</span>
                             </button>
 
-                            {/* Settings Tab */}
+                            {/* Settings Tab - just opens modal, doesn't change active tab */}
                             <button
-                                onClick={() => {
-                                    setActiveNavTab("settings");
-                                    setIsSettingsModalOpen(true);
-                                }}
+                                onClick={() => setIsSettingsModalOpen(true)}
                                 className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
-                                    activeNavTab === "settings"
+                                    isSettingsModalOpen
                                         ? "text-zinc-200 bg-zinc-700/50"
                                         : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                                 }`}
