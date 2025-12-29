@@ -118,7 +118,7 @@ function DashboardContent({
     const [showSolanaBanner, setShowSolanaBanner] = useState(true);
     
     // Bottom navigation tab state - default to chats
-    type NavTab = "agents" | "friends" | "chats" | "calls" | "settings";
+    type NavTab = "agents" | "friends" | "chats" | "calls" | "leaderboard" | "settings";
     const [activeNavTab, setActiveNavTab] = useState<NavTab>("chats");
     const [currentCallFriend, setCurrentCallFriend] =
         useState<FriendsListFriend | null>(null);
@@ -497,6 +497,7 @@ function DashboardContent({
     const { logCall, updateCall } = useCallHistory(userAddress);
     const [currentCallId, setCurrentCallId] = useState<string | null>(null);
     const [callStartTime, setCallStartTime] = useState<Date | null>(null);
+    const [showNewCallDropdown, setShowNewCallDropdown] = useState(false);
 
     // Waku works with both EVM and Solana addresses
     const wakuContext = useXMTPContext();
@@ -3197,8 +3198,9 @@ function DashboardContent({
                                 </div>
                                 {/* Quick call button */}
                                 {friendsListData.length > 0 && (
-                                    <div className="relative group">
+                                    <div className="relative">
                                         <button
+                                            onClick={() => setShowNewCallDropdown(!showNewCallDropdown)}
                                             className="py-2 px-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all flex items-center gap-2"
                                         >
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3207,30 +3209,49 @@ function DashboardContent({
                                             New Call
                                         </button>
                                         {/* Dropdown with friends */}
-                                        <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 max-h-64 overflow-y-auto">
-                                            <div className="p-2">
-                                                <p className="text-xs text-zinc-500 px-2 py-1">Select a friend to call</p>
-                                                {friendsListData.slice(0, 10).map((friend) => (
-                                                    <button
-                                                        key={friend.id}
-                                                        onClick={() => handleCall(friend, false)}
-                                                        disabled={callState !== "idle"}
-                                                        className="w-full flex items-center gap-3 p-2 hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
+                                        <AnimatePresence>
+                                            {showNewCallDropdown && (
+                                                <>
+                                                    {/* Backdrop to close dropdown */}
+                                                    <div 
+                                                        className="fixed inset-0 z-40" 
+                                                        onClick={() => setShowNewCallDropdown(false)}
+                                                    />
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, y: -10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: -10 }}
+                                                        className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto"
                                                     >
-                                                        {friend.avatar ? (
-                                                            <img src={friend.avatar} alt="" className="w-8 h-8 rounded-full" />
-                                                        ) : (
-                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-sm text-white">
-                                                                {(friend.nickname || friend.reachUsername || friend.ensName || friend.address)?.[0]?.toUpperCase() || "?"}
-                                                            </div>
-                                                        )}
-                                                        <span className="text-sm text-white truncate">
-                                                            {friend.nickname || friend.reachUsername || friend.ensName || `${friend.address.slice(0, 6)}...${friend.address.slice(-4)}`}
-                                                        </span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
+                                                        <div className="p-2">
+                                                            <p className="text-xs text-zinc-500 px-2 py-1">Select a friend to call</p>
+                                                            {friendsListData.slice(0, 10).map((friend) => (
+                                                                <button
+                                                                    key={friend.id}
+                                                                    onClick={() => {
+                                                                        setShowNewCallDropdown(false);
+                                                                        handleCall(friend, false);
+                                                                    }}
+                                                                    disabled={callState !== "idle"}
+                                                                    className="w-full flex items-center gap-3 p-2 hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
+                                                                >
+                                                                    {friend.avatar ? (
+                                                                        <img src={friend.avatar} alt="" className="w-8 h-8 rounded-full" />
+                                                                    ) : (
+                                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-sm text-white">
+                                                                            {(friend.nickname || friend.reachUsername || friend.ensName || friend.address)?.[0]?.toUpperCase() || "?"}
+                                                                        </div>
+                                                                    )}
+                                                                    <span className="text-sm text-white truncate">
+                                                                        {friend.nickname || friend.reachUsername || friend.ensName || `${friend.address.slice(0, 6)}...${friend.address.slice(-4)}`}
+                                                                    </span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </motion.div>
+                                                </>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
                                 )}
                             </div>
@@ -3246,9 +3267,9 @@ function DashboardContent({
                     </div>
                     )}
 
-                    {/* Leaderboard - show on all tabs except settings */}
-                    {activeNavTab !== "settings" && (
-                    <div className="mt-6">
+                    {/* Leaderboard Section */}
+                    {activeNavTab === "leaderboard" && (
+                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
                         <Leaderboard userAddress={userAddress} limit={50} />
                     </div>
                     )}
@@ -3342,6 +3363,19 @@ function DashboardContent({
                             >
                                 <span className="text-lg">📞</span>
                                 <span className="text-[10px] font-medium">Calls</span>
+                            </button>
+
+                            {/* Leaderboard Tab */}
+                            <button
+                                onClick={() => setActiveNavTab("leaderboard")}
+                                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
+                                    activeNavTab === "leaderboard"
+                                        ? "text-yellow-400 bg-yellow-500/20"
+                                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                                }`}
+                            >
+                                <span className="text-lg">🏆</span>
+                                <span className="text-[10px] font-medium">Ranks</span>
                             </button>
 
                             {/* Settings Tab */}
