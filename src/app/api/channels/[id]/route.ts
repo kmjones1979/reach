@@ -1,0 +1,45 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// GET /api/channels/[id] - Get channel details
+export async function GET(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id } = await params;
+    const userAddress = request.nextUrl.searchParams.get("userAddress");
+
+    const { data: channel, error } = await supabase
+        .from("shout_public_channels")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+    if (error || !channel) {
+        return NextResponse.json(
+            { error: "Channel not found" },
+            { status: 404 }
+        );
+    }
+
+    // Check if user is a member
+    let is_member = false;
+    if (userAddress) {
+        const { data: membership } = await supabase
+            .from("shout_channel_members")
+            .select("id")
+            .eq("channel_id", id)
+            .eq("user_address", userAddress.toLowerCase())
+            .single();
+
+        is_member = !!membership;
+    }
+
+    return NextResponse.json({ channel: { ...channel, is_member } });
+}
+

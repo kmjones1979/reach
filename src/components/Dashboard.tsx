@@ -18,6 +18,10 @@ import { IncomingCallModal } from "./IncomingCallModal";
 import { ChatModal } from "./ChatModal";
 import { CallHistory } from "./CallHistory";
 import { useCallHistory } from "@/hooks/useCallHistory";
+import { BrowseChannelsModal } from "./BrowseChannelsModal";
+import { ChannelChatModal } from "./ChannelChatModal";
+import { useChannels } from "@/hooks/useChannels";
+import type { PublicChannel } from "@/app/api/channels/route";
 import { UsernameClaimModal } from "./UsernameClaimModal";
 import { PhoneVerificationModal } from "./PhoneVerificationModal";
 import { XMTPProvider, useXMTPContext } from "@/context/WakuProvider";
@@ -505,6 +509,11 @@ function DashboardContent({
     const [currentCallId, setCurrentCallId] = useState<string | null>(null);
     const [callStartTime, setCallStartTime] = useState<Date | null>(null);
     const [showNewCallDropdown, setShowNewCallDropdown] = useState(false);
+
+    // Public channels
+    const { joinedChannels, leaveChannel, fetchJoinedChannels } = useChannels(userAddress);
+    const [isBrowseChannelsOpen, setIsBrowseChannelsOpen] = useState(false);
+    const [selectedChannel, setSelectedChannel] = useState<PublicChannel | null>(null);
 
     // Waku works with both EVM and Solana addresses
     const wakuContext = useXMTPContext();
@@ -2945,7 +2954,8 @@ function DashboardContent({
                     {/* Chats Section - Shows FriendsList in chat mode plus Group Chats */}
                     {activeNavTab === "chats" && (
                     <>
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                    {/* Direct Messages (Chats) - Show first */}
+                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
                         <div className="p-6 border-b border-zinc-800">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -2978,6 +2988,149 @@ function DashboardContent({
                         </div>
                     </div>
 
+                    {/* Group Chats Section */}
+                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
+                        <div className="p-6 border-b border-zinc-800">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">
+                                        Group Chats
+                                    </h2>
+                                    <p className="text-zinc-500 text-sm mt-1">
+                                        {groups.length + joinedChannels.length + 1} total
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setIsBrowseChannelsOpen(true)}
+                                        className="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-medium transition-all flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                        <span className="hidden sm:inline">Browse</span>
+                                    </button>
+                                    {isWakuInitialized && !isPasskeyUser && (
+                                        <button
+                                            onClick={() => setIsCreateGroupOpen(true)}
+                                            disabled={friends.length === 0}
+                                            className="py-2 px-3 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF7700] text-white font-medium transition-all hover:shadow-lg hover:shadow-orange-500/25 flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            <span className="hidden sm:inline">New</span>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 space-y-2">
+                            {/* Spritz Global Chat - always show first */}
+                            <motion.button
+                                onClick={() => setIsAlphaChatOpen(true)}
+                                className={`w-full rounded-xl p-3 transition-all text-left ${
+                                    isAlphaMember 
+                                        ? "bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50" 
+                                        : "bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 hover:border-orange-500/50"
+                                }`}
+                                whileTap={{ scale: 0.99 }}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="relative flex-shrink-0">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                                            <span className="text-lg">🍊</span>
+                                        </div>
+                                        {isAlphaMember && alphaUnreadCount > 0 && (
+                                            <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full flex items-center justify-center">
+                                                <span className="text-white text-[10px] font-bold">
+                                                    {alphaUnreadCount > 9 ? "9+" : alphaUnreadCount}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-white font-medium truncate">Spritz Global</p>
+                                            <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] rounded">Official</span>
+                                        </div>
+                                        <p className="text-zinc-500 text-sm">
+                                            {isAlphaMember ? "Community chat" : "Tap to join"}
+                                        </p>
+                                    </div>
+                                    <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            </motion.button>
+
+                            {/* Public Channels */}
+                            {joinedChannels.map((channel) => (
+                                <button
+                                    key={channel.id}
+                                    onClick={() => setSelectedChannel(channel)}
+                                    className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors text-left"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center text-xl">
+                                        {channel.emoji}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-white font-medium truncate">{channel.name}</p>
+                                            {channel.is_official && (
+                                                <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] rounded">Official</span>
+                                            )}
+                                        </div>
+                                        <p className="text-zinc-500 text-sm truncate">{channel.member_count} members</p>
+                                    </div>
+                                    <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            ))}
+
+                            {/* Private Group Chats */}
+                            {isWakuInitialized && !isPasskeyUser && groups.map((group) => (
+                                <button
+                                    key={group.id}
+                                    onClick={() => setSelectedGroup(group)}
+                                    className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors text-left"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center text-xl">
+                                        {group.emoji || "👥"}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-white font-medium truncate">{group.name}</p>
+                                            <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] rounded">Private</span>
+                                        </div>
+                                        <p className="text-zinc-500 text-sm truncate">
+                                            {group.memberCount || 0} members
+                                        </p>
+                                    </div>
+                                    <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            ))}
+
+                            {/* Empty state for channels */}
+                            {joinedChannels.length === 0 && groups.length === 0 && (
+                                <div className="text-center py-4">
+                                    <p className="text-zinc-500 text-sm">
+                                        <button
+                                            onClick={() => setIsBrowseChannelsOpen(true)}
+                                            className="text-[#FF5500] hover:underline"
+                                        >
+                                            Browse channels
+                                        </button>
+                                        {" "}to find communities to join
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Group Invitations Section */}
                     {isWakuInitialized &&
                         !isPasskeyUser &&
@@ -3005,188 +3158,6 @@ function DashboardContent({
                                 />
                             </div>
                         )}
-
-                    {/* Groups Section - Only show if Waku is enabled */}
-                    {isWakuInitialized && !isPasskeyUser && (
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6">
-                            <div className="p-6 border-b border-zinc-800">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-white">
-                                            Group Chats
-                                        </h2>
-                                        <p className="text-zinc-500 text-sm mt-1">
-                                            {groups.length}{" "}
-                                            {groups.length === 1
-                                                ? "group"
-                                                : "groups"}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={() =>
-                                            setIsCreateGroupOpen(true)
-                                        }
-                                        disabled={friends.length === 0}
-                                        className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                                            />
-                                        </svg>
-                                        New Group
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="p-6 space-y-2">
-                                {/* Spritz Global Chat - always show */}
-                                <motion.button
-                                    onClick={() => setIsAlphaChatOpen(true)}
-                                    className={`w-full rounded-xl p-3 sm:p-4 transition-all text-left ${
-                                        isAlphaMember 
-                                            ? "bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50" 
-                                            : "bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 hover:border-orange-500/50"
-                                    }`}
-                                    whileTap={{ scale: 0.99 }}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="relative flex-shrink-0">
-                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-                                                <span className="text-lg">🍊</span>
-                                            </div>
-                                            {isAlphaMember && alphaUnreadCount > 0 && (
-                                                <div className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-red-500 rounded-full flex items-center justify-center">
-                                                    <span className="text-white text-xs font-bold">
-                                                        {alphaUnreadCount > 9 ? "9+" : alphaUnreadCount}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-white font-medium truncate text-sm sm:text-base">
-                                                    Spritz Global Chat
-                                                </p>
-                                                {isAlphaMember && alphaMembership?.notifications_muted && (
-                                                    <svg className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            <p className="text-zinc-500 text-xs sm:text-sm">
-                                                {isAlphaMember ? "Community" : "Tap to join the Spritz community"}
-                                            </p>
-                                        </div>
-                                        {isAlphaMember ? (
-                                            <svg className="w-5 h-5 text-zinc-600 hover:text-zinc-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                            </svg>
-                                        ) : (
-                                            <span className="px-3 py-1 bg-orange-500/20 text-orange-400 text-xs font-medium rounded-full">
-                                                Join
-                                            </span>
-                                        )}
-                                    </div>
-                                </motion.button>
-                                
-                                <GroupsList
-                                    groups={groups}
-                                    onOpenGroup={handleOpenGroup}
-                                    unreadCounts={unreadCounts}
-                                    isLoading={isLoadingGroups}
-                                    activeGroupCalls={Object.fromEntries(
-                                        Object.entries(activeGroupCalls).map(
-                                            ([groupId, call]) => [
-                                                groupId,
-                                                {
-                                                    participantCount:
-                                                        call.participantCount,
-                                                    isVideo: call.isVideo,
-                                                },
-                                            ]
-                                        )
-                                    )}
-                                    onJoinCall={handleJoinGroupCall}
-                                    hideEmptyState={true}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Community Section - For users without Waku (passkey users) */}
-                    {(!isWakuInitialized || isPasskeyUser) && (
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6">
-                            <div className="p-6 border-b border-zinc-800">
-                                <h2 className="text-xl font-bold text-white">
-                                    Community
-                                </h2>
-                                <p className="text-zinc-500 text-sm mt-1">
-                                    Chat with the Spritz community
-                                </p>
-                            </div>
-                            <div className="p-6">
-                                <motion.button
-                                    onClick={() => setIsAlphaChatOpen(true)}
-                                    className={`w-full rounded-xl p-3 sm:p-4 transition-all text-left ${
-                                        isAlphaMember 
-                                            ? "bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50" 
-                                            : "bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 hover:border-orange-500/50"
-                                    }`}
-                                    whileTap={{ scale: 0.99 }}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="relative flex-shrink-0">
-                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-                                                <span className="text-lg">🍊</span>
-                                            </div>
-                                            {isAlphaMember && alphaUnreadCount > 0 && (
-                                                <div className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-red-500 rounded-full flex items-center justify-center">
-                                                    <span className="text-white text-xs font-bold">
-                                                        {alphaUnreadCount > 9 ? "9+" : alphaUnreadCount}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-white font-medium truncate text-sm sm:text-base">
-                                                    Spritz Global Chat
-                                                </p>
-                                                {isAlphaMember && alphaMembership?.notifications_muted && (
-                                                    <svg className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            <p className="text-zinc-500 text-xs sm:text-sm">
-                                                {isAlphaMember ? "Tap to open community chat" : "Tap to join the Spritz community"}
-                                            </p>
-                                        </div>
-                                        {isAlphaMember ? (
-                                            <svg className="w-5 h-5 text-zinc-600 hover:text-zinc-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                            </svg>
-                                        ) : (
-                                            <span className="px-3 py-1 bg-orange-500/20 text-orange-400 text-xs font-medium rounded-full">
-                                                Join
-                                            </span>
-                                        )}
-                                    </div>
-                                </motion.button>
-                            </div>
-                        </div>
-                    )}
                     </>
                     )}
 
@@ -3635,6 +3606,34 @@ function DashboardContent({
                     onStartCall={handleStartGroupCall}
                     hasActiveCall={callState !== "idle" || !!currentGroupCall}
                     getUserInfo={getAlphaUserInfo}
+                />
+            )}
+
+            {/* Browse Channels Modal */}
+            <BrowseChannelsModal
+                isOpen={isBrowseChannelsOpen}
+                onClose={() => {
+                    setIsBrowseChannelsOpen(false);
+                    fetchJoinedChannels();
+                }}
+                userAddress={userAddress}
+                onJoinChannel={(channel) => {
+                    setIsBrowseChannelsOpen(false);
+                    setSelectedChannel(channel);
+                }}
+            />
+
+            {/* Channel Chat Modal */}
+            {selectedChannel && (
+                <ChannelChatModal
+                    isOpen={!!selectedChannel}
+                    onClose={() => setSelectedChannel(null)}
+                    channel={selectedChannel}
+                    userAddress={userAddress}
+                    onLeave={async () => {
+                        await leaveChannel(selectedChannel.id);
+                        setSelectedChannel(null);
+                    }}
                 />
             )}
 
