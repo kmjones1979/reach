@@ -511,6 +511,7 @@ function DashboardContent({
     const [currentCallId, setCurrentCallId] = useState<string | null>(null);
     const [callStartTime, setCallStartTime] = useState<Date | null>(null);
     const [showNewCallDropdown, setShowNewCallDropdown] = useState(false);
+    const [isRejectingCall, setIsRejectingCall] = useState(false);
 
     // Public channels
     const { joinedChannels, leaveChannel, fetchJoinedChannels } = useChannels(userAddress);
@@ -1399,6 +1400,10 @@ function DashboardContent({
     };
 
     const handleRejectCall = async () => {
+        // Prevent multiple rejections from spam clicking
+        if (isRejectingCall) return;
+        setIsRejectingCall(true);
+        
         stopRinging();
         // Log declined call - we are the callee declining a call from the caller
         if (incomingCall?.caller_address && userAddress) {
@@ -1410,6 +1415,7 @@ function DashboardContent({
             });
         }
         await rejectCall();
+        setIsRejectingCall(false);
     };
 
     // Handle when the other party hangs up
