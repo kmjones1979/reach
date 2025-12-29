@@ -295,9 +295,9 @@ export function PWAInstallPrompt() {
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 50 }}
-                className="fixed bottom-4 left-4 right-4 z-50 safe-area-pb"
+                className="fixed bottom-24 left-4 right-4 z-50"
             >
-                <div className="glass-card rounded-2xl p-4 shadow-xl border border-[#FB8D22]/20">
+                <div className="glass-card rounded-2xl p-4 shadow-xl border border-[#FB8D22]/20 backdrop-blur-xl bg-zinc-900/90">
                     <div className="flex items-start gap-3">
                         {/* App Icon */}
                         <SpritzLogo size="lg" rounded="xl" className="shrink-0" />
@@ -393,9 +393,9 @@ export function PWAInstallPrompt() {
                     initial={{ opacity: 0, y: 50 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 50 }}
-                    className="fixed bottom-4 left-4 right-4 z-50 safe-area-pb"
+                    className="fixed bottom-24 left-4 right-4 z-50"
                 >
-                    <div className="glass-card rounded-2xl p-4 shadow-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-900/20 to-emerald-800/20">
+                    <div className="glass-card rounded-2xl p-4 shadow-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-900/20 to-emerald-800/20 backdrop-blur-xl">
                         <div className="flex items-start gap-3">
                             {/* Update Icon */}
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center flex-shrink-0">
