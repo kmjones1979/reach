@@ -669,6 +669,7 @@ export function FriendsList({
 
     // New state for search, filter, sort, and favorites
     const [searchQuery, setSearchQuery] = useState("");
+    const [showSearch, setShowSearch] = useState(false);
     const [filter, setFilter] = useState<FilterType>("all");
     const [sortBy, setSortBy] = useState<SortType>("name");
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -1096,145 +1097,77 @@ export function FriendsList({
     }
 
     return (
-        <div className="space-y-4">
-            {/* Search Bar */}
-            <div className="relative">
-                <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                </svg>
-                <input
-                    type="text"
-                    placeholder="Search friends..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    spellCheck={false}
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    autoComplete="off"
-                    className="w-full pl-10 pr-4 py-2.5 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#FF5500]/50 focus:border-transparent transition-all"
-                />
-                {searchQuery && (
-                    <button
-                        onClick={() => setSearchQuery("")}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 hover:text-zinc-300 transition-colors"
-                    >
-                        <svg
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                            />
-                        </svg>
-                    </button>
-                )}
-            </div>
-
-            {/* Filter Tabs & Sort */}
+        <div className="space-y-3">
+            {/* Filter Tabs, Search Toggle & Sort */}
             <div className="flex items-center justify-between gap-2">
-                {/* Filter Tabs */}
+                {/* Filter Tabs - Compact */}
                 <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg">
                     <button
                         onClick={() => setFilter("all")}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${
                             filter === "all"
                                 ? "bg-[#FF5500] text-white"
                                 : "text-zinc-400 hover:text-white"
                         }`}
                     >
                         All
-                        <span className="ml-1 text-xs opacity-70">
+                        <span className="ml-1 text-[10px] sm:text-xs opacity-70">
                             {friends.length}
                         </span>
                     </button>
                     <button
                         onClick={() => setFilter("online")}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                        className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all flex items-center gap-1 ${
                             filter === "online"
                                 ? "bg-emerald-500 text-white"
                                 : "text-zinc-400 hover:text-white"
                         }`}
                     >
-                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        Online
-                        <span className="text-xs opacity-70">
+                        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400" />
+                        <span className="hidden sm:inline">Online</span>
+                        <span className="text-[10px] sm:text-xs opacity-70">
                             {onlineCount}
                         </span>
                     </button>
                     <button
                         onClick={() => setFilter("favorites")}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${
+                        className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all flex items-center gap-1 ${
                             filter === "favorites"
                                 ? "bg-amber-500 text-white"
                                 : "text-zinc-400 hover:text-white"
                         }`}
                     >
                         <svg
-                            className="w-3.5 h-3.5"
+                            className="w-3 h-3 sm:w-3.5 sm:h-3.5"
                             fill="currentColor"
                             viewBox="0 0 24 24"
                         >
                             <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                         </svg>
-                        <span className="hidden sm:inline">Favorites</span>
-                        <span className="text-xs opacity-70">
+                        <span className="text-[10px] sm:text-xs opacity-70">
                             {favoritesCount}
                         </span>
                     </button>
                 </div>
 
-                {/* Tag Filter Pills */}
-                {availableTags.length > 0 && (
-                    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-                        {selectedTagFilter && (
-                            <button
-                                onClick={() => setSelectedTagFilter(null)}
-                                className="px-2 py-1 rounded-md text-xs text-zinc-400 hover:text-white transition-colors whitespace-nowrap"
-                                title="Clear tag filter"
-                            >
-                                ✕
-                            </button>
-                        )}
-                        {availableTags.slice(0, 5).map((tag) => (
-                            <button
-                                key={tag}
-                                onClick={() =>
-                                    setSelectedTagFilter(
-                                        selectedTagFilter === tag ? null : tag
-                                    )
-                                }
-                                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                                    selectedTagFilter === tag
-                                        ? "bg-[#FF5500] text-white"
-                                        : "bg-[#FF5500]/10 text-[#FFBBA7] hover:bg-[#FF5500]/20"
-                                }`}
-                            >
-                                {tag}
-                            </button>
-                        ))}
-                        {availableTags.length > 5 && (
-                            <span className="text-xs text-zinc-500 whitespace-nowrap">
-                                +{availableTags.length - 5} more
-                            </span>
-                        )}
-                    </div>
-                )}
+                {/* Search Toggle & Sort */}
+                <div className="flex items-center gap-1">
+                    {/* Search Toggle Button */}
+                    <button
+                        onClick={() => setShowSearch(!showSearch)}
+                        className={`p-1.5 sm:p-2 rounded-lg transition-all ${
+                            showSearch || searchQuery
+                                ? "bg-[#FF5500] text-white"
+                                : "bg-zinc-800/50 text-zinc-400 hover:text-white"
+                        }`}
+                        title="Search friends"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </button>
 
-                {/* Sort Dropdown */}
+                    {/* Sort Dropdown */}
                 <div className="relative">
                     <button
                         onClick={() => setShowSortMenu(!showSortMenu)}
@@ -1327,7 +1260,96 @@ export function FriendsList({
                         )}
                     </AnimatePresence>
                 </div>
+                </div>
             </div>
+
+            {/* Expandable Search Bar */}
+            <AnimatePresence>
+                {showSearch && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="relative">
+                            <svg
+                                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Search friends..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                spellCheck={false}
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                autoComplete="off"
+                                autoFocus
+                                className="w-full pl-9 pr-8 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#FF5500]/50 transition-all"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery("")}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 hover:text-zinc-300 transition-colors"
+                                >
+                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Tag Filter Pills */}
+            {availableTags.length > 0 && (
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-1">
+                    {selectedTagFilter && (
+                        <button
+                            onClick={() => setSelectedTagFilter(null)}
+                            className="px-2 py-1 rounded-md text-xs text-zinc-400 hover:text-white transition-colors whitespace-nowrap"
+                            title="Clear tag filter"
+                        >
+                            ✕
+                        </button>
+                    )}
+                    {availableTags.slice(0, 5).map((tag) => (
+                        <button
+                            key={tag}
+                            onClick={() =>
+                                setSelectedTagFilter(
+                                    selectedTagFilter === tag ? null : tag
+                                )
+                            }
+                            className={`px-2 py-0.5 rounded text-xs font-medium transition-all whitespace-nowrap ${
+                                selectedTagFilter === tag
+                                    ? "bg-[#FF5500] text-white"
+                                    : "bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700"
+                            }`}
+                        >
+                            {tag}
+                        </button>
+                    ))}
+                    {availableTags.length > 5 && (
+                        <span className="text-xs text-zinc-500 whitespace-nowrap">
+                            +{availableTags.length - 5}
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* Results count when searching/filtering */}
             {(searchQuery || filter !== "all" || selectedTagFilter) && (
