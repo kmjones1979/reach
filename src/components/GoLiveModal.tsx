@@ -160,12 +160,21 @@ export function GoLiveModal({
         // Nuclear option: Try to enumerate all active media devices
         // This might catch tracks that aren't attached to DOM elements
         try {
-            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-                navigator.mediaDevices.enumerateDevices().then((devices) => {
-                    console.log("[GoLive] Active media devices:", devices.length);
-                }).catch((e) => {
-                    console.error("[GoLive] Error enumerating devices:", e);
-                });
+            if (
+                navigator.mediaDevices &&
+                navigator.mediaDevices.enumerateDevices
+            ) {
+                navigator.mediaDevices
+                    .enumerateDevices()
+                    .then((devices) => {
+                        console.log(
+                            "[GoLive] Active media devices:",
+                            devices.length
+                        );
+                    })
+                    .catch((e) => {
+                        console.error("[GoLive] Error enumerating devices:", e);
+                    });
             }
         } catch (e) {
             // Ignore
@@ -192,7 +201,7 @@ export function GoLiveModal({
 
         // Clear ingest URL to unmount Broadcast component
         setIngestUrl(null);
-        
+
         // Log how many tracks we stopped
         console.log(`[GoLive] Stopped ${allTracks.length} media tracks`);
     }, []);
