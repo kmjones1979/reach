@@ -26,10 +26,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate OAuth URL
-    // Using readonly scope to avoid OAuth verification requirement
-    // Can add calendar.events scope later when scheduling feature is implemented
+    // Using calendar.events scope to allow reading busy times and creating events
     const scopes = [
         "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
     ].join(" ");
 
     const state = Buffer.from(JSON.stringify({ userAddress })).toString("base64");

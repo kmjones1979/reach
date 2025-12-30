@@ -234,11 +234,13 @@ export async function POST(request: NextRequest) {
                 const startDateTime = format(zonedStart, "yyyy-MM-dd'T'HH:mm:ss", { timeZone: recipientTimezone });
                 const endDateTime = format(zonedEnd, "yyyy-MM-dd'T'HH:mm:ss", { timeZone: recipientTimezone });
                 
+                // Create event without attendees to avoid permission issues
+                // Guest will receive email invite separately via Resend
                 const event = await calendar.events.insert({
                     calendarId: connection.calendar_id || "primary",
                     requestBody: {
                         summary: eventTitle,
-                        description: eventDescription,
+                        description: `${eventDescription}\n\nGuest: ${guestName || ""} ${guestEmail ? `<${guestEmail}>` : ""}`.trim(),
                         start: {
                             dateTime: startDateTime,
                             timeZone: recipientTimezone,
@@ -247,18 +249,9 @@ export async function POST(request: NextRequest) {
                             dateTime: endDateTime,
                             timeZone: recipientTimezone,
                         },
-                        attendees: guestEmail
-                            ? [
-                                  {
-                                      email: guestEmail,
-                                      displayName: guestName || guestEmail,
-                                  },
-                              ]
-                            : [],
                         reminders: {
                             useDefault: false,
                             overrides: [
-                                { method: "email", minutes: 24 * 60 }, // 24 hours before
                                 { method: "popup", minutes: 15 }, // 15 minutes before
                             ],
                         },
