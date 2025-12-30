@@ -36,6 +36,22 @@ export function GoLiveModal({
     const [duration, setDuration] = useState(0);
     const [ingestUrl, setIngestUrl] = useState<string | null>(null);
     const [cameraReady, setCameraReady] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    // Generate shareable URL
+    const shareUrl = currentStream?.id ? `https://app.spritz.chat/live/${currentStream.id}` : null;
+
+    // Copy share URL to clipboard
+    const copyShareUrl = async () => {
+        if (!shareUrl) return;
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (e) {
+            console.error("[GoLive] Failed to copy:", e);
+        }
+    };
     
 
     // Start camera preview
@@ -357,6 +373,35 @@ export function GoLiveModal({
 
                                     {/* Bottom controls */}
                                     <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/70 to-transparent pointer-events-auto">
+                                        {/* Share URL bar */}
+                                        {shareUrl && (
+                                            <div className="mb-4 flex items-center gap-2 bg-black/60 rounded-xl p-2 backdrop-blur-sm">
+                                                <div className="flex-1 px-3 py-2 bg-zinc-800/50 rounded-lg text-white/80 text-sm truncate">
+                                                    {shareUrl}
+                                                </div>
+                                                <button
+                                                    onClick={copyShareUrl}
+                                                    className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 shrink-0"
+                                                >
+                                                    {copied ? (
+                                                        <>
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                            Copied!
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                            </svg>
+                                                            Share
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        )}
+
                                         <div className="flex items-center justify-center gap-6">
                                             {/* Audio toggle */}
                                             <Broadcast.AudioEnabledTrigger className="p-4 bg-black/50 hover:bg-black/70 rounded-full transition-colors">
