@@ -52,7 +52,18 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { address, signature, message } = await request.json();
+        let body;
+        try {
+            const text = await request.text();
+            if (!text) {
+                return NextResponse.json({ error: "Request body is required" }, { status: 400 });
+            }
+            body = JSON.parse(text);
+        } catch {
+            return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
+        }
+        
+        const { address, signature, message } = body;
 
         if (!address || !signature || !message) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
