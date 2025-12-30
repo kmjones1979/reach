@@ -1,28 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
-  <!-- Background gradient -->
+  <!-- Background - Dark zinc like the app -->
+  <rect width="1200" height="630" fill="#09090B"/>
+  
+  <!-- Subtle gradient overlay -->
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#18181B"/>
-      <stop offset="100%" style="stop-color:#27272A"/>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF5500;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#09090B;stop-opacity:0" />
     </linearGradient>
   </defs>
-  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#bgGrad)"/>
   
-  <!-- Subtle grid pattern -->
-  <defs>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#3F3F46" stroke-width="0.5"/>
-    </pattern>
-  </defs>
-  <rect width="1200" height="630" fill="url(#grid)" opacity="0.3"/>
-  
-  <!-- Logo container -->
-  <g transform="translate(500, 165)">
-    <!-- Icon background -->
-    <rect width="200" height="200" rx="42" fill="#FFF5E6"/>
+  <!-- Orange Logo Container - positioned left side -->
+  <g transform="translate(80, 65)">
+    <!-- Background rectangle for logo -->
+    <rect width="500" height="500" rx="100" fill="#FFF5E6"/>
     
-    <!-- 8-bit Orange - scaled down from 512 to 200 -->
-    <g transform="scale(0.39)">
+    <!-- Orange pixel art - centered within 500x500 (offset by ~6px to center the ~488px wide orange) -->
+    <g transform="translate(6, -4)">
       <!-- Stem (dark brown) -->
       <rect x="240" y="96" width="32" height="32" fill="#8B4513"/>
       
@@ -109,13 +104,17 @@
     </g>
   </g>
   
-  <!-- App name -->
-  <text x="600" y="430" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="white" text-anchor="middle">Spritz</text>
+  <!-- Text: Spritz -->
+  <text x="620" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="120" font-weight="bold" fill="#FFFFFF">Spritz</text>
   
   <!-- Tagline -->
-  <text x="600" y="490" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#A1A1AA" text-anchor="middle">Censorship-Resistant Chat for Web3</text>
+  <text x="620" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="36" fill="#A1A1AA">Censorship-Resistant Chat for Web3</text>
+  
+  <!-- Features -->
+  <text x="620" y="440" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#71717A">🔐 Passkeys &amp; Wallets</text>
+  <text x="620" y="480" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#71717A">📹 HD Video Calls &amp; Livestreaming</text>
+  <text x="620" y="520" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#71717A">🤖 AI Agents</text>
   
   <!-- URL -->
-  <text x="600" y="580" font-family="monospace" font-size="20" fill="#52525B" text-anchor="middle">app.spritz.chat</text>
+  <text x="620" y="580" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#FF5500">app.spritz.chat</text>
 </svg>
-
