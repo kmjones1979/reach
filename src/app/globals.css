@@ -51,6 +51,30 @@ body {
     background: #52525b;
 }
 
+/* Thin scrollbar for modals */
+.scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 2px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #52525b;
+}
+
+/* Firefox scrollbar support */
+.scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 transparent;
+}
+
 /* Animated gradient background */
 .gradient-bg {
     background: linear-gradient(

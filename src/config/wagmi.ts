@@ -1,7 +1,7 @@
 "use client";
 
 import { createStorage, http } from "wagmi";
-import { mainnet, sepolia, baseSepolia, base } from "wagmi/chains";
+import { mainnet, sepolia, baseSepolia, base, arbitrum, optimism, polygon } from "wagmi/chains";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 
 // Get projectId from environment
@@ -13,8 +13,8 @@ if (!projectId) {
     );
 }
 
-// EVM Networks
-export const evmNetworks = [mainnet, sepolia, base, baseSepolia];
+// EVM Networks - includes all networks with USDC support for scheduling payments
+export const evmNetworks = [mainnet, sepolia, base, baseSepolia, arbitrum, optimism, polygon];
 
 // Custom localStorage wrapper for PWA persistence
 const localStorageWrapper = {
@@ -45,6 +45,9 @@ export const wagmiAdapter = new WagmiAdapter({
         [sepolia.id]: http(),
         [base.id]: http(),
         [baseSepolia.id]: http(),
+        [arbitrum.id]: http(),
+        [optimism.id]: http(),
+        [polygon.id]: http(),
     },
 });
 

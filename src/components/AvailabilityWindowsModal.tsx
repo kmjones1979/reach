@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useCalendar } from "@/hooks/useCalendar";
+import { getUserTimezone, COMMON_TIMEZONES } from "@/lib/timezone";
 
 type AvailabilityWindowsModalProps = {
     isOpen: boolean;
@@ -38,6 +39,7 @@ export function AvailabilityWindowsModal({
         dayOfWeek: number;
         startTime: string;
         endTime: string;
+        timezone: string;
     } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -61,6 +63,7 @@ export function AvailabilityWindowsModal({
                 dayOfWeek: editingWindow.dayOfWeek,
                 startTime: editingWindow.startTime,
                 endTime: editingWindow.endTime,
+                timezone: editingWindow.timezone,
             });
             setEditingWindow(null);
         } catch (err) {
@@ -86,6 +89,7 @@ export function AvailabilityWindowsModal({
             dayOfWeek: 1, // Monday
             startTime: "09:00",
             endTime: "17:00",
+            timezone: getUserTimezone(),
         });
     };
 
@@ -237,6 +241,27 @@ export function AvailabilityWindowsModal({
                                                 />
                                             </div>
                                         </div>
+                                        <div>
+                                            <label className="block text-sm text-zinc-400 mb-1">
+                                                Timezone
+                                            </label>
+                                            <select
+                                                value={editingWindow.timezone}
+                                                onChange={(e) =>
+                                                    setEditingWindow({
+                                                        ...editingWindow,
+                                                        timezone: e.target.value,
+                                                    })
+                                                }
+                                                className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-white focus:outline-none focus:border-orange-500"
+                                            >
+                                                {COMMON_TIMEZONES.map((tz) => (
+                                                    <option key={tz.value} value={tz.value}>
+                                                        {tz.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={handleSave}
@@ -286,6 +311,7 @@ export function AvailabilityWindowsModal({
                                                         dayOfWeek: window.day_of_week,
                                                         startTime: window.start_time,
                                                         endTime: window.end_time,
+                                                        timezone: window.timezone || getUserTimezone(),
                                                     })
                                                 }
                                                 className="px-3 py-1.5 rounded-lg bg-zinc-700 text-white text-sm hover:bg-zinc-600 transition-colors"

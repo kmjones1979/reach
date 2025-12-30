@@ -100,6 +100,7 @@ type FriendCardProps = {
     friendSocials: SocialLinks | undefined;
     friendPhone: string | undefined;
     friendTag: FriendTag | null;
+    schedulingEnabled: boolean;
     wakuStatus: boolean | undefined;
     unreadCount: number;
     isCallActive: boolean;
@@ -124,6 +125,7 @@ const FriendCard = memo(function FriendCard({
     friendSocials,
     friendPhone,
     friendTag,
+    schedulingEnabled,
     wakuStatus,
     unreadCount,
     isCallActive,
@@ -558,6 +560,31 @@ const FriendCard = memo(function FriendCard({
                                 </div>
                             )}
 
+                        {/* Schedule button (if friend has scheduling enabled) */}
+                        {schedulingEnabled && (
+                            <a
+                                href={`/schedule/${friend.address}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mb-3 py-2.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-sm transition-colors flex items-center justify-center gap-2"
+                            >
+                                <svg
+                                    className="w-4 h-4 shrink-0"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
+                                </svg>
+                                <span>Schedule a Call</span>
+                            </a>
+                        )}
+
                         {/* Tag, Copy & Remove buttons */}
                         <div className="grid grid-cols-3 gap-2">
                             <button
@@ -659,6 +686,9 @@ export function FriendsList({
     const [friendPhones, setFriendPhones] = useState<Record<string, string>>(
         {}
     );
+    const [friendScheduling, setFriendScheduling] = useState<Record<string, boolean>>(
+        {}
+    );
 
     // Friend tags hook
     const { getTag, setTag, getAllTags } = useFriendTags(userAddress || null);
@@ -709,11 +739,11 @@ export function FriendsList({
                 phonesResult,
                 favoritesResult,
             ] = await Promise.all([
-                // Combined query for statuses + online (was 2 separate queries!)
+                // Combined query for statuses + online + scheduling (was 2 separate queries!)
                 client
                     .from("shout_user_settings")
                     .select(
-                        "wallet_address, status_emoji, status_text, is_dnd, last_seen"
+                        "wallet_address, status_emoji, status_text, is_dnd, last_seen, scheduling_enabled, scheduling_slug"
                     )
                     .in("wallet_address", addresses),
                 // Socials
@@ -736,10 +766,11 @@ export function FriendsList({
                     : Promise.resolve({ data: null, error: null }),
             ]);
 
-            // Process user settings (statuses + online)
+            // Process user settings (statuses + online + scheduling)
             if (userSettingsResult.data) {
                 const statuses: Record<string, FriendStatus> = {};
                 const online: Record<string, boolean> = {};
+                const scheduling: Record<string, boolean> = {};
                 const now = Date.now();
                 const ONLINE_THRESHOLD = 120000; // 2 minutes
 
@@ -755,9 +786,14 @@ export function FriendsList({
                         online[row.wallet_address] =
                             now - lastSeenTime < ONLINE_THRESHOLD;
                     }
+                    // Check if scheduling enabled
+                    if (row.scheduling_enabled) {
+                        scheduling[row.wallet_address] = true;
+                    }
                 });
                 setFriendStatuses(statuses);
                 setOnlineStatuses(online);
+                setFriendScheduling(scheduling);
             }
 
             // Process socials
@@ -1452,6 +1488,10 @@ export function FriendsList({
                                         }
                                         friendPhone={friendPhones[addressLower]}
                                         friendTag={getTag(addressLower)}
+                                        schedulingEnabled={
+                                            friendScheduling[addressLower] ||
+                                            false
+                                        }
                                         wakuStatus={
                                             friendsWakuStatus[addressLower]
                                         }
@@ -1494,6 +1534,7 @@ export function FriendsList({
                                 friendSocials={friendSocials[addressLower]}
                                 friendPhone={friendPhones[addressLower]}
                                 friendTag={getTag(addressLower)}
+                                schedulingEnabled={friendScheduling[addressLower] || false}
                                 wakuStatus={friendsWakuStatus[addressLower]}
                                 unreadCount={unreadCounts[addressLower] || 0}
                                 isCallActive={isCallActive}
