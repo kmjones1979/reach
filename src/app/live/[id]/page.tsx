@@ -480,32 +480,60 @@ export default function PublicLivePage() {
         }
     };
 
-    const toggleMute = () => {
+    const toggleMute = async () => {
         if (!videoRef.current) return;
-        const newMutedState = !videoRef.current.muted;
-        videoRef.current.muted = newMutedState;
-        setIsMuted(newMutedState);
-        // If unmuting and volume is 0, set to a reasonable volume
-        if (!newMutedState && volume === 0) {
-            const newVolume = 0.5;
-            videoRef.current.volume = newVolume;
-            setVolume(newVolume);
+        const video = videoRef.current;
+        const newMutedState = !video.muted;
+        
+        // If unmuting, ensure volume is set and video is playing
+        if (!newMutedState) {
+            // Set a reasonable volume if it's 0
+            if (volume === 0) {
+                const newVolume = 0.5;
+                video.volume = newVolume;
+                setVolume(newVolume);
+            }
+            // Unmute first
+            video.muted = false;
+            setIsMuted(false);
+            // Ensure video is playing (browser may have paused muted autoplay)
+            if (video.paused) {
+                try {
+                    await video.play();
+                } catch (e) {
+                    console.error("[Live] Failed to play after unmute:", e);
+                }
+            }
+        } else {
+            // Muting
+            video.muted = true;
+            setIsMuted(true);
         }
     };
 
-    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleVolumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const newVolume = parseFloat(e.target.value);
         setVolume(newVolume);
         if (videoRef.current) {
-            videoRef.current.volume = newVolume;
+            const video = videoRef.current;
+            video.volume = newVolume;
+            
             // Unmute if volume is increased from 0
-            if (newVolume > 0 && videoRef.current.muted) {
-                videoRef.current.muted = false;
+            if (newVolume > 0 && video.muted) {
+                video.muted = false;
                 setIsMuted(false);
+                // Ensure video is playing when unmuting via volume slider
+                if (video.paused) {
+                    try {
+                        await video.play();
+                    } catch (e) {
+                        console.error("[Live] Failed to play after volume change:", e);
+                    }
+                }
             }
             // Mute if volume is set to 0
             if (newVolume === 0) {
-                videoRef.current.muted = true;
+                video.muted = true;
                 setIsMuted(true);
             }
         }
