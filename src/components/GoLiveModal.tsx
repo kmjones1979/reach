@@ -37,25 +37,15 @@ export function GoLiveModal({
     const [ingestUrl, setIngestUrl] = useState<string | null>(null);
     const [cameraReady, setCameraReady] = useState(false);
     
-    // Detect mobile for camera constraints
-    const isMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
     // Start camera preview
     const startCamera = useCallback(async () => {
         try {
             setError(null);
             
-            // Use vertical/portrait for mobile, landscape for desktop
+            // Use default camera resolution - let the device choose best quality
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: isMobile ? {
-                    // Mobile: request portrait dimensions
-                    facingMode: "user",
-                    width: { ideal: 1080 },
-                    height: { ideal: 1920 },
-                } : {
-                    // Desktop: standard landscape
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
+                video: {
                     facingMode: "user",
                 },
                 audio: true,
@@ -74,7 +64,7 @@ export function GoLiveModal({
             setError("Failed to access camera. Please allow camera permissions.");
             setCameraReady(false);
         }
-    }, [isMobile]);
+    }, []);
 
     // Stop camera
     const stopCamera = useCallback(() => {
@@ -270,17 +260,9 @@ export function GoLiveModal({
                         /* Live broadcast mode */
                         <Broadcast.Root
                             ingestUrl={ingestUrl}
-                            aspectRatio={isMobile ? 9 / 16 : 16 / 9}
-                            video={isMobile ? {
-                                // Mobile: portrait
+                            aspectRatio={null}
+                            video={{
                                 facingMode: "user",
-                                width: { ideal: 1080 },
-                                height: { ideal: 1920 },
-                            } : {
-                                // Desktop: landscape
-                                facingMode: "user",
-                                width: { ideal: 1280 },
-                                height: { ideal: 720 },
                             }}
                             audio={true}
                             forceEnabled
