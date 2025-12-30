@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Hls from "hls.js";
 import Image from "next/image";
 
@@ -22,14 +22,35 @@ type StreamData = {
     };
 };
 
+type ChatMessage = {
+    id: string;
+    stream_id: string;
+    user_address: string;
+    message: string;
+    type: "message" | "reaction";
+    created_at: string;
+    user?: {
+        username: string | null;
+        display_name: string | null;
+        ens_name: string | null;
+        avatar_url: string | null;
+    };
+};
+
+// Emoji reactions
+const REACTIONS = ["❤️", "🔥", "👏", "😂", "😮", "🎉"];
+
 export default function PublicLivePage() {
     const params = useParams();
+    const router = useRouter();
     const streamId = params.id as string;
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
     const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const hasTrackedViewerRef = useRef(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    const lastMessageTimeRef = useRef<string | null>(null);
 
     const [stream, setStream] = useState<StreamData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -40,9 +61,108 @@ export default function PublicLivePage() {
     const [isMuted, setIsMuted] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const [viewerCount, setViewerCount] = useState(0);
+    const [streamEnded, setStreamEnded] = useState(false);
+
+    // Auth state - check for logged in user
+    const [userAddress, setUserAddress] = useState<string | null>(null);
+    const [userUsername, setUserUsername] = useState<string | null>(null);
+    const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
+    const [userEnsName, setUserEnsName] = useState<string | null>(null);
+
+    // Chat state
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [newMessage, setNewMessage] = useState("");
+    const [isSending, setIsSending] = useState(false);
+    const [showChat, setShowChat] = useState(true);
+    const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
 
     const MAX_RETRIES = 60;
     const RETRY_INTERVAL = 1000;
+
+    // Check if user is logged in (via localStorage saved credentials)
+    useEffect(() => {
+        const checkAuth = async () => {
+            let address: string | null = null;
+            
+            // Check for passkey users first (spritz_passkey_address)
+            const passkeyAddress = localStorage.getItem("spritz_passkey_address");
+            if (passkeyAddress) {
+                address = passkeyAddress.toLowerCase();
+            }
+            
+            // Check for SIWE/SIWS authenticated users (spritz_auth_credentials)
+            if (!address) {
+                const authCredentials = localStorage.getItem("spritz_auth_credentials");
+                if (authCredentials) {
+                    try {
+                        const parsed = JSON.parse(authCredentials);
+                        const AUTH_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+                        if (parsed?.address && Date.now() - parsed.timestamp < AUTH_TTL) {
+                            address = parsed.address.toLowerCase();
+                        }
+                    } catch {
+                        // Invalid credentials
+                    }
+                }
+            }
+            
+            // Check wagmi store for connected wallet
+            if (!address) {
+                const wagmiState = localStorage.getItem("wagmi.store");
+                if (wagmiState) {
+                    try {
+                        const parsed = JSON.parse(wagmiState);
+                        // Try to get the current account address
+                        const current = parsed?.state?.current;
+                        if (current) {
+                            const connections = parsed?.state?.connections;
+                            if (connections) {
+                                // connections is a Map-like structure serialized as array of [key, value]
+                                const connectionEntries = connections?.value || connections;
+                                if (Array.isArray(connectionEntries)) {
+                                    for (const entry of connectionEntries) {
+                                        const conn = Array.isArray(entry) ? entry[1] : entry;
+                                        if (conn?.accounts?.[0]) {
+                                            address = conn.accounts[0].toLowerCase();
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch {
+                        // Invalid state
+                    }
+                }
+            }
+            
+            if (address) {
+                setUserAddress(address);
+                
+                // Fetch user info from Supabase
+                try {
+                    const res = await fetch(`/api/public/user?address=${encodeURIComponent(address)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.user) {
+                            setUserUsername(data.user.username || null);
+                            setUserDisplayName(data.user.display_name || null);
+                            setUserEnsName(data.user.ens_name || null);
+                        }
+                    }
+                } catch {
+                    // Ignore errors
+                }
+            }
+        };
+        
+        checkAuth();
+        
+        // Also listen for storage changes in case user logs in from another tab
+        const handleStorageChange = () => checkAuth();
+        window.addEventListener("storage", handleStorageChange);
+        return () => window.removeEventListener("storage", handleStorageChange);
+    }, [streamId]);
 
     // Fetch stream data
     useEffect(() => {
@@ -57,6 +177,12 @@ export default function PublicLivePage() {
                 const data = await res.json();
                 setStream(data.stream);
                 setViewerCount(data.stream.viewer_count || 0);
+                
+                // Check if stream already ended
+                if (data.stream.status === "ended") {
+                    setStreamEnded(true);
+                }
+                
                 setIsLoading(false);
             } catch {
                 setError("Failed to load stream");
@@ -92,25 +218,138 @@ export default function PublicLivePage() {
         }
     }, [stream, streamId]);
 
-    // Refresh viewer count
+    // Refresh viewer count and check stream status
     useEffect(() => {
         if (!stream) return;
 
-        const refreshViewerCount = async () => {
+        const refreshStreamData = async () => {
             try {
                 const res = await fetch(`/api/public/streams/${streamId}`);
                 if (res.ok) {
                     const data = await res.json();
                     setViewerCount(data.stream.viewer_count || 0);
+                    
+                    // Check if stream has ended
+                    if (data.stream.status === "ended" && !streamEnded) {
+                        setStreamEnded(true);
+                        // Stop the video
+                        if (videoRef.current) {
+                            videoRef.current.pause();
+                        }
+                        if (hlsRef.current) {
+                            hlsRef.current.destroy();
+                            hlsRef.current = null;
+                        }
+                    }
                 }
             } catch {
                 // Ignore
             }
         };
 
-        const interval = setInterval(refreshViewerCount, 5000);
+        const interval = setInterval(refreshStreamData, 5000);
         return () => clearInterval(interval);
-    }, [stream, streamId]);
+    }, [stream, streamId, streamEnded]);
+
+    // Fetch chat messages
+    const fetchMessages = useCallback(async () => {
+        if (!streamId) return;
+
+        try {
+            const url = lastMessageTimeRef.current
+                ? `/api/streams/${streamId}/chat?since=${encodeURIComponent(lastMessageTimeRef.current)}`
+                : `/api/streams/${streamId}/chat`;
+
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.messages && data.messages.length > 0) {
+                    setMessages((prev) => {
+                        // Merge new messages, avoiding duplicates
+                        const existingIds = new Set(prev.map((m) => m.id));
+                        const newMsgs = data.messages.filter((m: ChatMessage) => !existingIds.has(m.id));
+                        return [...prev, ...newMsgs];
+                    });
+                    lastMessageTimeRef.current = data.messages[data.messages.length - 1].created_at;
+                }
+            }
+        } catch {
+            // Ignore
+        }
+    }, [streamId]);
+
+    // Initial fetch and polling for chat
+    useEffect(() => {
+        if (!stream) return;
+
+        fetchMessages();
+        const interval = setInterval(fetchMessages, 2000);
+        return () => clearInterval(interval);
+    }, [stream, fetchMessages]);
+
+    // Auto-scroll chat to bottom
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    // Send chat message
+    const sendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!userAddress || !newMessage.trim() || isSending) return;
+
+        setIsSending(true);
+        try {
+            const res = await fetch(`/api/streams/${streamId}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userAddress,
+                    message: newMessage.trim(),
+                    type: "message",
+                }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setMessages((prev) => [...prev, data.message]);
+                setNewMessage("");
+            }
+        } catch {
+            // Ignore
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    // Send reaction
+    const sendReaction = async (emoji: string) => {
+        if (!userAddress) return;
+
+        // Add floating reaction animation
+        const id = Math.random().toString(36);
+        const x = 20 + Math.random() * 60; // Random x position 20-80%
+        setFloatingReactions((prev) => [...prev, { id, emoji, x }]);
+        setTimeout(() => {
+            setFloatingReactions((prev) => prev.filter((r) => r.id !== id));
+        }, 2000);
+
+        // Send to server
+        try {
+            await fetch(`/api/streams/${streamId}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userAddress,
+                    message: emoji,
+                    type: "reaction",
+                }),
+            });
+        } catch {
+            // Ignore
+        }
+    };
 
     // Initialize HLS player
     const initHls = useCallback(() => {
@@ -137,7 +376,10 @@ export default function PublicLivePage() {
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 setIsWaitingForBroadcast(false);
                 setRetryCount(0);
-                video.play().catch(() => setIsPlaying(false));
+                // Try to play - will be muted initially for autoplay
+                video.play().catch(() => {
+                    setIsPlaying(false);
+                });
             });
 
             hls.on(Hls.Events.ERROR, (_, data) => {
@@ -164,6 +406,7 @@ export default function PublicLivePage() {
             });
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
             video.src = stream.playback_url;
+            video.muted = true; // Ensure muted for autoplay
             video.addEventListener("loadedmetadata", () => {
                 setIsWaitingForBroadcast(false);
                 video.play().catch(() => setIsPlaying(false));
@@ -182,9 +425,9 @@ export default function PublicLivePage() {
         }
     }, [stream?.playback_url, retryCount]);
 
-    // Initialize player when stream data is loaded
+    // Initialize player when stream data is loaded (only if not ended)
     useEffect(() => {
-        if (stream?.playback_url) {
+        if (stream?.playback_url && !streamEnded) {
             initHls();
         }
 
@@ -197,12 +440,16 @@ export default function PublicLivePage() {
                 clearTimeout(retryTimeoutRef.current);
             }
         };
-    }, [stream?.playback_url]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [stream?.playback_url, streamEnded]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Video events
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
+
+        // Set initial muted state for autoplay
+        video.muted = true;
+        setIsMuted(true);
 
         const handlePlay = () => setIsPlaying(true);
         const handlePause = () => setIsPlaying(false);
@@ -241,6 +488,23 @@ export default function PublicLivePage() {
     };
 
     const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
+    
+    // Get display name with priority: username > display_name > ens_name > formatted address
+    const getDisplayName = (msg: ChatMessage) => {
+        if (msg.user?.username) return msg.user.username;
+        if (msg.user?.display_name) return msg.user.display_name;
+        if (msg.user?.ens_name) return msg.user.ens_name;
+        return formatAddress(msg.user_address);
+    };
+    
+    // Get current user display name with priority: username > display_name > ens_name > formatted address
+    const getCurrentUserDisplayName = () => {
+        if (!userAddress) return "";
+        if (userUsername) return userUsername;
+        if (userDisplayName) return userDisplayName;
+        if (userEnsName) return userEnsName;
+        return formatAddress(userAddress);
+    };
 
     // Loading state
     if (isLoading) {
@@ -267,7 +531,7 @@ export default function PublicLivePage() {
                     <h1 className="text-2xl font-bold text-white mb-2">Stream Not Found</h1>
                     <p className="text-zinc-400 mb-8">This stream may have ended or doesn&apos;t exist.</p>
                     <a
-                        href="https://app.spritz.chat"
+                        href="/"
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:from-orange-400 hover:to-red-400 transition-all"
                     >
                         <Image src="/icons/icon-96x96.png" alt="Spritz" width={24} height={24} className="rounded" />
@@ -281,31 +545,53 @@ export default function PublicLivePage() {
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col">
             {/* Header */}
-            <header className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-                <a href="https://app.spritz.chat" className="flex items-center gap-2">
+            <header className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between shrink-0">
+                <a href="/" className="flex items-center gap-2">
                     <Image src="/icons/icon-96x96.png" alt="Spritz" width={32} height={32} className="rounded-lg" />
                     <span className="text-white font-bold text-lg">Spritz</span>
                 </a>
-                <a
-                    href="https://app.spritz.chat"
-                    className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold rounded-lg hover:from-orange-400 hover:to-red-400 transition-all"
-                >
-                    Join Spritz
-                </a>
+                {userAddress ? (
+                    <div className="flex items-center gap-2 text-sm">
+                        <span className="text-zinc-400">Signed in as</span>
+                        <span className="text-white font-medium">{getCurrentUserDisplayName()}</span>
+                    </div>
+                ) : (
+                    <a
+                        href="/"
+                        className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold rounded-lg hover:from-orange-400 hover:to-red-400 transition-all"
+                    >
+                        Sign In
+                    </a>
+                )}
             </header>
 
             {/* Main content */}
-            <main className="flex-1 flex flex-col lg:flex-row">
+            <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                 {/* Video section */}
-                <div className="flex-1 flex flex-col bg-black">
+                <div className="flex-1 flex flex-col bg-black relative min-h-[40vh] lg:min-h-0">
                     {/* Video container */}
-                    <div className="relative flex-1 flex items-center justify-center group min-h-[50vh] lg:min-h-0">
+                    <div className="relative flex-1 flex items-center justify-center group">
                         <video
                             ref={videoRef}
                             className="w-full h-full object-contain"
                             playsInline
+                            autoPlay
+                            muted
                             onClick={togglePlay}
                         />
+
+                        {/* Floating reactions */}
+                        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                            {floatingReactions.map((r) => (
+                                <div
+                                    key={r.id}
+                                    className="absolute animate-float-up text-4xl"
+                                    style={{ left: `${r.x}%`, bottom: "20%" }}
+                                >
+                                    {r.emoji}
+                                </div>
+                            ))}
+                        </div>
 
                         {/* Waiting for broadcast */}
                         {isWaitingForBroadcast && !error && (
@@ -323,13 +609,8 @@ export default function PublicLivePage() {
                                     <p className="text-zinc-400 text-sm mb-4">
                                         The streamer is setting up. The video will appear once they start broadcasting.
                                     </p>
-                                    <div className="flex items-center justify-center gap-1">
-                                        <span className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                        <span className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                        <span className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                                    </div>
                                     {retryCount > 0 && (
-                                        <p className="text-zinc-500 text-xs mt-4">
+                                        <p className="text-zinc-500 text-xs">
                                             Checking for stream... ({retryCount}/{MAX_RETRIES})
                                         </p>
                                     )}
@@ -337,8 +618,33 @@ export default function PublicLivePage() {
                             </div>
                         )}
 
+                        {/* Stream ended overlay */}
+                        {streamEnded && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black">
+                                <div className="text-center max-w-sm px-4">
+                                    <div className="w-20 h-20 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <svg className="w-10 h-10 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-white mb-2">Stream has ended</h3>
+                                    <p className="text-zinc-400 mb-6">
+                                        Thanks for watching! The recording will be available soon.
+                                    </p>
+                                    <a
+                                        href="/"
+                                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:from-orange-400 hover:to-red-400 transition-all"
+                                    >
+                                        <Image src="/icons/icon-96x96.png" alt="" width={20} height={20} className="rounded" />
+                                        Back to Spritz
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Error overlay */}
-                        {error && (
+                        {error && !streamEnded && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black">
                                 <div className="text-center">
                                     <svg className="w-12 h-12 text-red-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -406,75 +712,164 @@ export default function PublicLivePage() {
                                         LIVE
                                     </span>
                                 )}
+
+                                {/* Chat toggle (mobile) */}
+                                <button
+                                    onClick={() => setShowChat(!showChat)}
+                                    className="lg:hidden p-2 hover:bg-white/20 rounded-lg transition-colors"
+                                >
+                                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                </button>
                             </div>
                         </div>
+
+                        {/* Reaction bar (always visible when logged in) */}
+                        {userAddress && (
+                            <div className="absolute right-4 bottom-20 flex flex-col gap-2">
+                                {REACTIONS.map((emoji) => (
+                                    <button
+                                        key={emoji}
+                                        onClick={() => sendReaction(emoji)}
+                                        className="w-12 h-12 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-full flex items-center justify-center text-2xl transition-transform hover:scale-110 active:scale-95"
+                                    >
+                                        {emoji}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Info sidebar */}
-                <div className="w-full lg:w-96 bg-zinc-900 border-t lg:border-t-0 lg:border-l border-zinc-800 p-6">
+                {/* Sidebar with streamer info and chat */}
+                <div className={`${showChat ? "flex" : "hidden lg:flex"} w-full lg:w-96 bg-zinc-900 border-t lg:border-t-0 lg:border-l border-zinc-800 flex-col max-h-[60vh] lg:max-h-full`}>
                     {/* Streamer info */}
-                    <div className="flex items-center gap-3 mb-6">
-                        {stream?.streamer.avatar_url ? (
-                            <img
-                                src={stream.streamer.avatar_url}
-                                alt=""
-                                className="w-12 h-12 rounded-full object-cover ring-2 ring-red-500"
-                            />
-                        ) : (
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold ring-2 ring-red-500">
-                                {(stream?.streamer.display_name || stream?.streamer.address || "?").slice(0, 2).toUpperCase()}
-                            </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                                <span className="text-white font-medium truncate">
-                                    {stream?.streamer.display_name || formatAddress(stream?.streamer.address || "")}
-                                </span>
-                                {stream?.status === "live" && (
-                                    <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse shrink-0">
-                                        LIVE
+                    <div className="p-4 border-b border-zinc-800 shrink-0">
+                        <div className="flex items-center gap-3 mb-3">
+                            {stream?.streamer.avatar_url ? (
+                                <img
+                                    src={stream.streamer.avatar_url}
+                                    alt=""
+                                    className="w-12 h-12 rounded-full object-cover ring-2 ring-red-500"
+                                />
+                            ) : (
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-bold ring-2 ring-red-500">
+                                    {(stream?.streamer.display_name || stream?.streamer.address || "?").slice(0, 2).toUpperCase()}
+                                </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-white font-medium truncate">
+                                        {stream?.streamer.display_name || formatAddress(stream?.streamer.address || "")}
                                     </span>
-                                )}
+                                    {stream?.status === "live" && (
+                                        <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse shrink-0">
+                                            LIVE
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-zinc-400 text-sm">{viewerCount} watching</p>
                             </div>
-                            <p className="text-zinc-400 text-sm">{viewerCount} watching</p>
                         </div>
+                        <h1 className="text-lg font-bold text-white">{stream?.title || "Live Stream"}</h1>
                     </div>
 
-                    {/* Stream title */}
-                    <h1 className="text-xl font-bold text-white mb-2">
-                        {stream?.title || "Live Stream"}
-                    </h1>
-                    {stream?.description && (
-                        <p className="text-zinc-400 mb-6">{stream.description}</p>
-                    )}
+                    {/* Chat messages */}
+                    <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                        {messages.length === 0 ? (
+                            <div className="text-center text-zinc-500 py-8">
+                                <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                <p className="text-sm">No messages yet</p>
+                                <p className="text-xs mt-1">Be the first to say something!</p>
+                            </div>
+                        ) : (
+                                            messages.map((msg) => (
+                                <div key={msg.id} className={msg.type === "reaction" ? "flex justify-center" : ""}>
+                                    {msg.type === "reaction" ? (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <span className="text-zinc-500">
+                                                {getDisplayName(msg)}
+                                            </span>
+                                            <span className="text-2xl">{msg.message}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-zinc-600 to-zinc-700 flex items-center justify-center text-white text-xs font-medium shrink-0">
+                                                {getDisplayName(msg).slice(0, 2).toUpperCase()}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-zinc-300 font-medium text-sm">
+                                                        {getDisplayName(msg)}
+                                                    </span>
+                                                    <span className="text-zinc-600 text-xs">
+                                                        {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                    </span>
+                                                </div>
+                                                <p className="text-white text-sm break-words">{msg.message}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
 
-                    {stream?.started_at && (
-                        <p className="text-zinc-500 text-sm mb-6">
-                            Started {new Date(stream.started_at).toLocaleString()}
-                        </p>
-                    )}
-
-                    {/* CTA */}
-                    <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
-                        <h3 className="text-white font-semibold mb-2">Join the conversation</h3>
-                        <p className="text-zinc-400 text-sm mb-4">
-                            Create a free Spritz account to chat, make calls, and go live yourself!
-                        </p>
-                        <a
-                            href="https://app.spritz.chat"
-                            className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-lg hover:from-orange-400 hover:to-red-400 transition-all"
-                        >
-                            <Image src="/icons/icon-96x96.png" alt="" width={20} height={20} className="rounded" />
-                            Sign up for Spritz
-                        </a>
-                        <p className="text-zinc-500 text-xs text-center mt-3">
-                            No email required • Sign in with wallet or passkey
-                        </p>
+                    {/* Chat input */}
+                    <div className="p-4 border-t border-zinc-800 shrink-0">
+                        {userAddress ? (
+                            <form onSubmit={sendMessage} className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newMessage}
+                                    onChange={(e) => setNewMessage(e.target.value)}
+                                    placeholder="Say something..."
+                                    maxLength={500}
+                                    className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 text-sm"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!newMessage.trim() || isSending}
+                                    className="px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+                                >
+                                    {isSending ? "..." : "Send"}
+                                </button>
+                            </form>
+                        ) : (
+                            <div className="text-center">
+                                <p className="text-zinc-400 text-sm mb-3">Sign in to chat and send reactions</p>
+                                <a
+                                    href="/"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold rounded-lg hover:from-orange-400 hover:to-red-400 transition-all"
+                                >
+                                    <Image src="/icons/icon-96x96.png" alt="" width={16} height={16} className="rounded" />
+                                    Sign In to Chat
+                                </a>
+                            </div>
+                        )}
                     </div>
                 </div>
             </main>
+
+            {/* CSS for floating animation */}
+            <style jsx>{`
+                @keyframes float-up {
+                    0% {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: translateY(-200px) scale(1.5);
+                    }
+                }
+                .animate-float-up {
+                    animation: float-up 2s ease-out forwards;
+                }
+            `}</style>
         </div>
     );
 }
-

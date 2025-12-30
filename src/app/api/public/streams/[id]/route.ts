@@ -76,21 +76,66 @@ export async function POST(
 
     // Handle sendBeacon leave action
     if (action === "leave") {
-        const { error } = await supabase.rpc("decrement_viewer_count", { stream_id: id });
-        if (error) {
-            console.error("[Public Streams API] Error decrementing viewer count:", error);
-        }
-        return NextResponse.json({ success: true });
+        return decrementViewerCount(id);
     }
 
     // Increment viewer count
-    const { error } = await supabase.rpc("increment_viewer_count", { stream_id: id });
-    if (error) {
-        console.error("[Public Streams API] Error incrementing viewer count:", error);
+    console.log("[Public Streams API] Viewer joining stream:", id);
+    
+    const { data: stream, error: fetchError } = await supabase
+        .from("shout_streams")
+        .select("viewer_count")
+        .eq("id", id)
+        .single();
+    
+    if (fetchError) {
+        console.error("[Public Streams API] Error fetching stream:", fetchError);
+        return NextResponse.json({ error: "Stream not found" }, { status: 404 });
+    }
+    
+    const newCount = (stream.viewer_count || 0) + 1;
+    const { error: updateError } = await supabase
+        .from("shout_streams")
+        .update({ viewer_count: newCount })
+        .eq("id", id);
+    
+    if (updateError) {
+        console.error("[Public Streams API] Error updating viewer count:", updateError);
         return NextResponse.json({ error: "Failed to track view" }, { status: 500 });
     }
+    
+    console.log("[Public Streams API] Updated viewer count to:", newCount);
+    return NextResponse.json({ success: true, viewer_count: newCount });
+}
 
-    return NextResponse.json({ success: true });
+// Helper to decrement viewer count
+async function decrementViewerCount(id: string) {
+    console.log("[Public Streams API] Viewer leaving stream:", id);
+    
+    const { data: stream, error: fetchError } = await supabase
+        .from("shout_streams")
+        .select("viewer_count")
+        .eq("id", id)
+        .single();
+    
+    if (fetchError) {
+        console.error("[Public Streams API] Error fetching stream for decrement:", fetchError);
+        return NextResponse.json({ success: false });
+    }
+    
+    const newCount = Math.max(0, (stream.viewer_count || 0) - 1);
+    const { error: updateError } = await supabase
+        .from("shout_streams")
+        .update({ viewer_count: newCount })
+        .eq("id", id);
+    
+    if (updateError) {
+        console.error("[Public Streams API] Error decrementing viewer count:", updateError);
+    } else {
+        console.log("[Public Streams API] Decremented viewer count to:", newCount);
+    }
+    
+    return NextResponse.json({ success: true, viewer_count: newCount });
 }
 
 // DELETE /api/public/streams/[id] - Decrement viewer count
@@ -99,12 +144,6 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id } = await params;
-
-    const { error } = await supabase.rpc("decrement_viewer_count", { stream_id: id });
-    if (error) {
-        console.error("[Public Streams API] Error decrementing viewer count:", error);
-    }
-
-    return NextResponse.json({ success: true });
+    return decrementViewerCount(id);
 }
 

@@ -64,7 +64,7 @@ import { AgentsSection } from "./AgentsSection";
 import { useBetaAccess } from "@/hooks/useBetaAccess";
 import Link from "next/link";
 import { GoLiveModal } from "./GoLiveModal";
-import { LiveStreamPlayer, LiveBadge } from "./LiveStreamPlayer";
+import { LiveBadge } from "./LiveStreamPlayer";
 import { useStreams } from "@/hooks/useStreams";
 import type { Stream } from "@/app/api/streams/route";
 
@@ -127,7 +127,7 @@ function DashboardContent({
     
     // Live streaming state
     const [isGoLiveModalOpen, setIsGoLiveModalOpen] = useState(false);
-    const [watchingStream, setWatchingStream] = useState<Stream | null>(null);
+    // watchingStream state removed - now using /live/[id] page instead
     
     // Bottom navigation tab state - default to chats
     type NavTab = "agents" | "friends" | "chats" | "calls" | "leaderboard";
@@ -2980,9 +2980,9 @@ function DashboardContent({
                                     {liveStreams.map((stream) => {
                                         const streamerInfo = getAlphaUserInfo(stream.user_address);
                                         return (
-                                            <button
+                                            <a
                                                 key={stream.id}
-                                                onClick={() => setWatchingStream(stream)}
+                                                href={`/live/${stream.id}`}
                                                 className="flex-shrink-0 group"
                                             >
                                                 <div className="relative">
@@ -3002,7 +3002,7 @@ function DashboardContent({
                                                 <p className="text-xs text-zinc-300 mt-1 text-center truncate w-14">
                                                     {streamerInfo?.name || `${stream.user_address.slice(0, 6)}...`}
                                                 </p>
-                                            </button>
+                                            </a>
                                         );
                                     })}
                                 </div>
@@ -3890,16 +3890,7 @@ function DashboardContent({
                 onEndStream={endStream}
             />
 
-            {/* Live Stream Player */}
-            {watchingStream && (
-                <LiveStreamPlayer
-                    isOpen={!!watchingStream}
-                    onClose={() => setWatchingStream(null)}
-                    stream={watchingStream}
-                    streamerName={getAlphaUserInfo(watchingStream.user_address)?.name || undefined}
-                    streamerAvatar={getAlphaUserInfo(watchingStream.user_address)?.avatar}
-                />
-            )}
+            {/* Live Stream Player removed - now using /live/[id] page */}
         </>
     );
 }
