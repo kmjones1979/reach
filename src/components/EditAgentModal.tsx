@@ -40,6 +40,7 @@ interface EditAgentModalProps {
         useKnowledgeBase?: boolean;
         mcpEnabled?: boolean;
         apiEnabled?: boolean;
+        schedulingEnabled?: boolean;
         x402Enabled?: boolean;
         x402PriceCents?: number;
         x402Network?: "base" | "base-sepolia";
@@ -91,6 +92,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
     const [useKnowledgeBase, setUseKnowledgeBase] = useState(true);
     const [mcpEnabled, setMcpEnabled] = useState(true);
     const [apiEnabled, setApiEnabled] = useState(true);
+    const [schedulingEnabled, setSchedulingEnabled] = useState(false);
     const [x402Enabled, setX402Enabled] = useState(false);
     const [x402PriceCents, setX402PriceCents] = useState(1);
     const [x402Network, setX402Network] = useState<"base" | "base-sepolia">("base");
@@ -150,6 +152,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
             setUseKnowledgeBase(agent.use_knowledge_base !== false);
             setMcpEnabled(agent.mcp_enabled !== false);
             setApiEnabled(agent.api_enabled !== false);
+            setSchedulingEnabled(agent.scheduling_enabled || false);
             setX402Enabled(agent.x402_enabled || false);
             setX402PriceCents(agent.x402_price_cents || 1);
             setX402Network(agent.x402_network || "base");
@@ -337,6 +340,7 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                 useKnowledgeBase,
                 mcpEnabled,
                 apiEnabled,
+                schedulingEnabled,
                 x402Enabled,
                 x402PriceCents,
                 x402Network,
@@ -589,6 +593,16 @@ export function EditAgentModal({ isOpen, onClose, agent, onSave, userAddress }: 
                                             enabled={apiEnabled}
                                             onChange={setApiEnabled}
                                             color="cyan"
+                                        />
+
+                                        {/* Scheduling Tool */}
+                                        <CapabilityToggle
+                                            icon="📅"
+                                            title="Scheduling Assistant"
+                                            description="Help users schedule meetings with you"
+                                            enabled={schedulingEnabled}
+                                            onChange={setSchedulingEnabled}
+                                            color="blue"
                                         />
 
                                         {/* x402 API Access */}

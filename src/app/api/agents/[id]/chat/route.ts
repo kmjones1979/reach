@@ -579,6 +579,113 @@ Remember: The user asked a question and the answer is in the data above. Just pr
             systemInstructions += `\n\n[REMINDER: Answer using the RETRIEVED INFORMATION at the top. DO NOT output code.]`;
         }
 
+        // Handle scheduling capability (if enabled)
+        const schedulingEnabled = agent.scheduling_enabled === true;
+        let schedulingContext = "";
+        
+        if (schedulingEnabled) {
+            const messageLower = message.toLowerCase();
+            const isSchedulingQuery = 
+                messageLower.includes("schedule") ||
+                messageLower.includes("book") ||
+                messageLower.includes("meeting") ||
+                messageLower.includes("call") ||
+                messageLower.includes("appointment") ||
+                messageLower.includes("availability") ||
+                messageLower.includes("available") ||
+                messageLower.includes("time slot") ||
+                messageLower.includes("when can") ||
+                messageLower.includes("set up a");
+            
+            if (isSchedulingQuery) {
+                console.log("[Chat] Scheduling query detected, fetching availability");
+                
+                try {
+                    // Get the agent owner's scheduling settings
+                    const { data: ownerSettings } = await supabase
+                        .from("shout_user_settings")
+                        .select("scheduling_enabled, scheduling_slug, scheduling_free_enabled, scheduling_paid_enabled, scheduling_free_duration_minutes, scheduling_paid_duration_minutes, scheduling_price_cents")
+                        .eq("wallet_address", agent.owner_address)
+                        .single();
+                    
+                    if (ownerSettings?.scheduling_enabled) {
+                        // Fetch availability for the next 7 days
+                        const startDate = new Date().toISOString();
+                        const endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                        
+                        const availabilityResponse = await fetch(
+                            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/scheduling/availability?userAddress=${agent.owner_address}&startDate=${startDate}&endDate=${endDate}`
+                        );
+                        
+                        if (availabilityResponse.ok) {
+                            const availabilityData = await availabilityResponse.json();
+                            const slots = availabilityData.availableSlots || [];
+                            
+                            // Group slots by date for cleaner presentation
+                            const slotsByDate: Record<string, string[]> = {};
+                            for (const slot of slots.slice(0, 30)) { // Limit to 30 slots
+                                const date = new Date(slot.start);
+                                const dateKey = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                                const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                                
+                                if (!slotsByDate[dateKey]) {
+                                    slotsByDate[dateKey] = [];
+                                }
+                                slotsByDate[dateKey].push(timeStr);
+                            }
+                            
+                            const scheduleLink = ownerSettings.scheduling_slug 
+                                ? `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/schedule/${ownerSettings.scheduling_slug}`
+                                : `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/schedule/${agent.owner_address}`;
+                            
+                            schedulingContext = `
+## SCHEDULING INFORMATION
+
+You can help users schedule meetings with your creator. Here's the current availability:
+
+${Object.entries(slotsByDate).map(([date, times]) => `**${date}:** ${times.join(', ')}`).join('\n')}
+
+${ownerSettings.scheduling_free_enabled ? `- **Free calls** available (${ownerSettings.scheduling_free_duration_minutes || 15} minutes)` : ''}
+${ownerSettings.scheduling_paid_enabled ? `- **Paid sessions** available (${ownerSettings.scheduling_paid_duration_minutes || 30} minutes) - $${((ownerSettings.scheduling_price_cents || 0) / 100).toFixed(2)} USD` : ''}
+
+**Booking Link:** ${scheduleLink}
+
+When helping users schedule:
+1. Present the available times in a friendly way
+2. Ask what type of meeting they'd like (free or paid, if both available)
+3. Once they choose a time, direct them to the booking link above
+4. If they need more details, explain they can provide their email and any notes when booking
+
+DO NOT pretend you can directly book the meeting - always direct them to the booking link.
+`;
+                            console.log("[Chat] Added scheduling context with", Object.keys(slotsByDate).length, "days of availability");
+                        }
+                    } else {
+                        schedulingContext = `
+## SCHEDULING NOTE
+
+My creator hasn't enabled their public scheduling page yet. Please ask them directly about their availability or suggest they enable the scheduling feature in their Spritz settings.
+`;
+                    }
+                } catch (err) {
+                    console.error("[Chat] Error fetching scheduling info:", err);
+                }
+            }
+            
+            // Always add scheduling capability info to system instructions
+            systemInstructions += `\n\n## Scheduling Capability
+You can help users schedule meetings with your creator. When users ask about scheduling, meeting times, or availability:
+- Be helpful and proactive
+- If you have availability data, present the times clearly
+- Always direct users to the booking link to complete their reservation
+- Ask clarifying questions if needed (preferred time of day, meeting type, etc.)
+`;
+            
+            if (schedulingContext) {
+                systemInstructions += schedulingContext;
+            }
+        }
+
         // Add API tool information and potentially call them (if API is enabled)
         const apiEnabled = agent.api_enabled !== false; // Default true
         if (apiEnabled && agent.api_tools && agent.api_tools.length > 0) {
