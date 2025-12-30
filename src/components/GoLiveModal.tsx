@@ -36,18 +36,26 @@ export function GoLiveModal({
     const [duration, setDuration] = useState(0);
     const [ingestUrl, setIngestUrl] = useState<string | null>(null);
     const [cameraReady, setCameraReady] = useState(false);
+    
+    // Detect mobile for camera constraints
+    const isMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
     // Start camera preview
     const startCamera = useCallback(async () => {
         try {
             setError(null);
             
-            // Use vertical/portrait 9:16 aspect ratio (like TikTok/Reels)
+            // Use vertical/portrait for mobile, landscape for desktop
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
+                video: isMobile ? {
+                    // Mobile: request portrait dimensions
+                    facingMode: "user",
                     width: { ideal: 1080 },
                     height: { ideal: 1920 },
-                    aspectRatio: { ideal: 9 / 16 },
+                } : {
+                    // Desktop: standard landscape
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
                     facingMode: "user",
                 },
                 audio: true,
@@ -66,7 +74,7 @@ export function GoLiveModal({
             setError("Failed to access camera. Please allow camera permissions.");
             setCameraReady(false);
         }
-    }, []);
+    }, [isMobile]);
 
     // Stop camera
     const stopCamera = useCallback(() => {
@@ -221,12 +229,17 @@ export function GoLiveModal({
                         /* Live broadcast mode */
                         <Broadcast.Root
                             ingestUrl={ingestUrl}
-                            aspectRatio={9 / 16}
-                            video={{
+                            aspectRatio={isMobile ? 9 / 16 : 16 / 9}
+                            video={isMobile ? {
+                                // Mobile: portrait
+                                facingMode: "user",
                                 width: { ideal: 1080 },
                                 height: { ideal: 1920 },
-                                aspectRatio: { ideal: 9 / 16 },
+                            } : {
+                                // Desktop: landscape
                                 facingMode: "user",
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 },
                             }}
                             audio={true}
                             forceEnabled
