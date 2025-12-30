@@ -132,6 +132,21 @@ export function GoLiveModal({
 
         try {
             await onEndStream(currentStream.id);
+            
+            // Stop all camera/media tracks from the Broadcast component
+            try {
+                const videoElements = document.querySelectorAll('video');
+                videoElements.forEach(video => {
+                    const stream = video.srcObject as MediaStream;
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                        video.srcObject = null;
+                    }
+                });
+            } catch (e) {
+                console.error("[GoLive] Error cleaning up video streams:", e);
+            }
+            
             setStatus("preview");
             setDuration(0);
             setIngestUrl(null);
