@@ -58,7 +58,7 @@ export default function PublicLivePage() {
     const [isWaitingForBroadcast, setIsWaitingForBroadcast] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [volume, setVolume] = useState(1);
-    const [isMuted, setIsMuted] = useState(false);
+    const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay
     const [retryCount, setRetryCount] = useState(0);
     const [viewerCount, setViewerCount] = useState(0);
     const [streamEnded, setStreamEnded] = useState(false);
@@ -447,19 +447,27 @@ export default function PublicLivePage() {
         const video = videoRef.current;
         if (!video) return;
 
-        // Set initial muted state for autoplay
+        // Set initial muted state for autoplay (browsers require muted autoplay)
         video.muted = true;
         setIsMuted(true);
 
         const handlePlay = () => setIsPlaying(true);
         const handlePause = () => setIsPlaying(false);
+        
+        // Sync muted state with video element
+        const handleVolumeChange = () => {
+            setIsMuted(video.muted);
+            setVolume(video.volume);
+        };
 
         video.addEventListener("play", handlePlay);
         video.addEventListener("pause", handlePause);
+        video.addEventListener("volumechange", handleVolumeChange);
 
         return () => {
             video.removeEventListener("play", handlePlay);
             video.removeEventListener("pause", handlePause);
+            video.removeEventListener("volumechange", handleVolumeChange);
         };
     }, []);
 
@@ -474,8 +482,15 @@ export default function PublicLivePage() {
 
     const toggleMute = () => {
         if (!videoRef.current) return;
-        videoRef.current.muted = !isMuted;
-        setIsMuted(!isMuted);
+        const newMutedState = !videoRef.current.muted;
+        videoRef.current.muted = newMutedState;
+        setIsMuted(newMutedState);
+        // If unmuting and volume is 0, set to a reasonable volume
+        if (!newMutedState && volume === 0) {
+            const newVolume = 0.5;
+            videoRef.current.volume = newVolume;
+            setVolume(newVolume);
+        }
     };
 
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -483,8 +498,17 @@ export default function PublicLivePage() {
         setVolume(newVolume);
         if (videoRef.current) {
             videoRef.current.volume = newVolume;
+            // Unmute if volume is increased from 0
+            if (newVolume > 0 && videoRef.current.muted) {
+                videoRef.current.muted = false;
+                setIsMuted(false);
+            }
+            // Mute if volume is set to 0
+            if (newVolume === 0) {
+                videoRef.current.muted = true;
+                setIsMuted(true);
+            }
         }
-        setIsMuted(newVolume === 0);
     };
 
     const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
