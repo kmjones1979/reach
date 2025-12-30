@@ -162,7 +162,24 @@ export function GoLiveModal({
             handleEndStream();
         }
 
+        // Stop all camera/media tracks
         stopCamera();
+        
+        // Also stop any tracks that might be held by other elements
+        // This ensures the green camera light turns off
+        try {
+            const videoElements = document.querySelectorAll('video');
+            videoElements.forEach(video => {
+                const stream = video.srcObject as MediaStream;
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    video.srcObject = null;
+                }
+            });
+        } catch (e) {
+            console.error("[GoLive] Error cleaning up video streams:", e);
+        }
+        
         setIngestUrl(null);
         setStatus("preview");
         onClose();
@@ -190,6 +207,30 @@ export function GoLiveModal({
             setIngestUrl(null);
         }
     }, [isOpen, currentStream?.status, currentStream?.stream_id, ingestUrl, isStarting, cameraReady, startCamera, stopCamera]);
+
+    // Cleanup on unmount - ensure camera is released
+    useEffect(() => {
+        return () => {
+            // Stop our tracked stream
+            if (mediaStreamRef.current) {
+                mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                mediaStreamRef.current = null;
+            }
+            // Stop any video element streams (catches Livepeer Broadcast camera)
+            try {
+                const videoElements = document.querySelectorAll('video');
+                videoElements.forEach(video => {
+                    const stream = video.srcObject as MediaStream;
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                        video.srcObject = null;
+                    }
+                });
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+        };
+    }, []);
 
     // Track duration while live
     useEffect(() => {
@@ -253,7 +294,7 @@ export function GoLiveModal({
                             <Broadcast.Container className="absolute inset-0 flex items-center justify-center">
                                 <Broadcast.Video
                                     title="Live broadcast"
-                                    className="w-full h-full object-contain"
+                                    className={`w-full h-full ${isMobile ? "object-cover" : "object-contain"}`}
                                     style={{ transform: "scaleX(-1)" }}
                                 />
 
@@ -372,7 +413,7 @@ export function GoLiveModal({
                                 autoPlay
                                 muted
                                 playsInline
-                                className="w-full h-full object-contain"
+                                className={`w-full h-full ${isMobile ? "object-cover" : "object-contain"}`}
                                 style={{ transform: "scaleX(-1)" }}
                             />
 
