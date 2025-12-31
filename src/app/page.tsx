@@ -50,7 +50,7 @@ function hasSavedWalletSession(): boolean {
 
 export default function Home() {
     // EVM wallet via wagmi
-    const { isReconnecting } = useAccount();
+    const { address: wagmiAddress, isConnected: isWagmiConnected, isReconnecting } = useAccount();
     const { reconnect } = useReconnect();
     // AppKit disconnect (works for both EVM and Solana)
     const { disconnect: walletDisconnect } = useDisconnect();
@@ -169,16 +169,16 @@ export default function Home() {
     );
 
     // Show loading while checking auth state
+    // For EVM wallets, also wait for wagmi to sync with AppKit
+    const isEvmSyncing = isWalletConnected && walletType === "evm" && !isWagmiConnected;
     const isCheckingAuth =
-        !mounted || initializing || isWalletReconnecting || isPasskeyLoading || (isWalletConnected && isSiweLoading);
+        !mounted || initializing || isWalletReconnecting || isPasskeyLoading || isEvmSyncing || (isWalletConnected && isSiweLoading);
 
     const handleLogout = () => {
         // Sign out SIWE
         siweSignOut();
-        // Disconnect wallet if connected (works for both EVM and Solana via AppKit)
-        if (isAppKitConnected) {
-            walletDisconnect();
-        }
+        // Disconnect wallet (AppKit handles both EVM and Solana)
+        walletDisconnect();
         // Logout passkey if authenticated
         if (isPasskeyAuthenticated) {
             passkeyLogout();
@@ -191,7 +191,7 @@ export default function Home() {
         let loadingMessage = "Loading...";
         if (signingIn) {
             loadingMessage = "Signing in...";
-        } else if (isWalletReconnecting) {
+        } else if (isWalletReconnecting || isEvmSyncing) {
             loadingMessage = "Reconnecting wallet...";
         } else if (isSiweLoading) {
             loadingMessage = "Authenticating...";
@@ -217,7 +217,12 @@ export default function Home() {
     }
 
     // Show sign-in prompt for wallet users who haven't signed yet (both EVM and Solana)
-    if (isWalletConnected && !isSiweAuthenticated && !signingIn) {
+    // For EVM: ensure wagmi is also ready (address available) before allowing sign-in
+    const isEvmWalletReady = walletType === "evm" && isWagmiConnected && wagmiAddress;
+    const isSolanaWalletReady = walletType === "solana";
+    const canShowSignIn = isWalletConnected && !isSiweAuthenticated && !signingIn && (isEvmWalletReady || isSolanaWalletReady);
+    
+    if (canShowSignIn) {
         const isEVM = walletType === "evm";
         const isSolana = walletType === "solana";
         const chainLabel = isSolana ? "Solana" : "Ethereum";
