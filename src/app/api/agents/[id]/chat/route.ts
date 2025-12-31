@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
 import { google } from "googleapis";
-import { localTimeToUTC } from "@/lib/timezone";
+import { localTimeToUTC, getDayOfWeekInTimezone } from "@/lib/timezone";
 import { toZonedTime, format } from "date-fns-tz";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -644,8 +644,10 @@ Remember: The user asked a question and the answer is in the data above. Just pr
                         for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
                             const checkDate = new Date(now);
                             checkDate.setDate(checkDate.getDate() + dayOffset);
-                            checkDate.setUTCHours(0, 0, 0, 0); // Reset to midnight UTC
-                            const dayOfWeek = checkDate.getDay();
+                            checkDate.setUTCHours(12, 0, 0, 0); // Set to noon UTC to avoid date boundary issues
+                            
+                            // Get day of week in user's timezone (important for correct day matching)
+                            const dayOfWeek = getDayOfWeekInTimezone(checkDate, userTimezone);
                             
                             const matchingWindows = (windows || []).filter(w => w.day_of_week === dayOfWeek);
                             

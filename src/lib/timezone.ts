@@ -130,6 +130,16 @@ export function convertTimezone(
 }
 
 /**
+ * Get the day of week (0-6, Sunday=0) for a date in a specific timezone
+ * This is important because a Date at midnight UTC could be a different day
+ * in different timezones
+ */
+export function getDayOfWeekInTimezone(date: Date, timezone: string): number {
+    const zonedDate = toZonedTime(date, timezone);
+    return zonedDate.getDay();
+}
+
+/**
  * Get common timezones list
  */
 export const COMMON_TIMEZONES = [

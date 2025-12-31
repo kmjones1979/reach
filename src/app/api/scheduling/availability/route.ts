@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { google } from "googleapis";
-import { localTimeToUTC } from "@/lib/timezone";
+import { localTimeToUTC, getDayOfWeekInTimezone } from "@/lib/timezone";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,10 +77,11 @@ export async function GET(request: NextRequest) {
 
         // Iterate through each day in the range
         const current = new Date(start);
-        current.setUTCHours(0, 0, 0, 0); // Start at midnight UTC
+        current.setUTCHours(12, 0, 0, 0); // Set to noon UTC to avoid date boundary issues
         
         while (current <= end) {
-            const dayOfWeek = current.getDay();
+            // Get day of week in user's timezone (important for correct day matching)
+            const dayOfWeek = getDayOfWeekInTimezone(current, userTimezone);
             const matchingWindows = windows.filter((w) => w.day_of_week === dayOfWeek);
 
             for (const window of matchingWindows) {
