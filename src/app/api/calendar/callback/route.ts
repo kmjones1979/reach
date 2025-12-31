@@ -6,21 +6,34 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Helper to get the app's base URL from the request
+function getAppUrl(request: NextRequest): string {
+    // Check environment variable first
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+        return process.env.NEXT_PUBLIC_APP_URL;
+    }
+    // Use the request's origin (handles both production and development)
+    const proto = request.headers.get("x-forwarded-proto") || "https";
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "localhost:3000";
+    return `${proto}://${host}`;
+}
+
 // GET /api/calendar/callback - Handle Google OAuth callback
 export async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get("code");
     const state = request.nextUrl.searchParams.get("state");
     const error = request.nextUrl.searchParams.get("error");
+    const appUrl = getAppUrl(request);
 
     if (error) {
         return NextResponse.redirect(
-            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}?calendar_error=${encodeURIComponent(error)}`
+            `${appUrl}?calendar_error=${encodeURIComponent(error)}`
         );
     }
 
     if (!code || !state) {
         return NextResponse.redirect(
-            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}?calendar_error=missing_params`
+            `${appUrl}?calendar_error=missing_params`
         );
     }
 
@@ -36,7 +49,7 @@ export async function GET(request: NextRequest) {
         // Exchange code for tokens
         const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
         const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-        const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/calendar/callback`;
+        const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `${appUrl}/api/calendar/callback`;
 
         const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
             method: "POST",
@@ -112,7 +125,7 @@ export async function GET(request: NextRequest) {
                 dbError.message?.includes("does not exist") || 
                 dbError.message?.includes("Could not find the table")) {
                 return NextResponse.redirect(
-                    `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}?calendar_error=${encodeURIComponent("Database tables not found. Please run the google_calendar.sql migration in Supabase.")}`
+                    `${appUrl}?calendar_error=${encodeURIComponent("Database tables not found. Please run the google_calendar.sql migration in Supabase.")}`
                 );
             }
             throw new Error("Failed to save calendar connection: " + dbError.message);
@@ -122,12 +135,12 @@ export async function GET(request: NextRequest) {
 
         // Redirect back to app
         return NextResponse.redirect(
-            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}?calendar_connected=true`
+            `${appUrl}?calendar_connected=true`
         );
     } catch (err) {
         console.error("[Calendar] Callback error:", err);
         return NextResponse.redirect(
-            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}?calendar_error=${encodeURIComponent(err instanceof Error ? err.message : "unknown_error")}`
+            `${appUrl}?calendar_error=${encodeURIComponent(err instanceof Error ? err.message : "unknown_error")}`
         );
     }
 }

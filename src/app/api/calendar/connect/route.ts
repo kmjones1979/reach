@@ -6,6 +6,18 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Helper to get the app's base URL from the request
+function getAppUrl(request: NextRequest): string {
+    // Check environment variable first
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+        return process.env.NEXT_PUBLIC_APP_URL;
+    }
+    // Use the request's origin (handles both production and development)
+    const proto = request.headers.get("x-forwarded-proto") || "https";
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "localhost:3000";
+    return `${proto}://${host}`;
+}
+
 // GET /api/calendar/connect - Initiate Google Calendar OAuth flow
 export async function GET(request: NextRequest) {
     const userAddress = request.nextUrl.searchParams.get("userAddress");
@@ -16,7 +28,8 @@ export async function GET(request: NextRequest) {
 
     const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
     const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-    const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/calendar/callback`;
+    const appUrl = getAppUrl(request);
+    const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `${appUrl}/api/calendar/callback`;
 
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
         return NextResponse.json(

@@ -12,6 +12,16 @@ const supabase = createClient(
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
+// Helper to get the app's base URL from the request
+function getAppUrl(request: NextRequest): string {
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+        return process.env.NEXT_PUBLIC_APP_URL;
+    }
+    const proto = request.headers.get("x-forwarded-proto") || "https";
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "localhost:3000";
+    return `${proto}://${host}`;
+}
+
 // POST /api/scheduling/schedule - Schedule a call with a user
 export async function POST(request: NextRequest) {
     try {
@@ -277,7 +287,7 @@ export async function POST(request: NextRequest) {
         if (resend && scheduledCall && (guestEmail || connection?.calendar_email)) {
             try {
                 // Call the invite endpoint to send beautiful emails
-                const inviteResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/scheduling/invite`, {
+                const inviteResponse = await fetch(`${getAppUrl(request)}/api/scheduling/invite`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({

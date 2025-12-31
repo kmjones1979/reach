@@ -1,7 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useAccount, useSignMessage } from "wagmi";
+import {
+    authStorage,
+    AUTH_CREDENTIALS_KEY,
+    AUTH_TTL,
+    type AuthCredentials,
+} from "@/lib/authStorage";
 
 // User state returned from authentication
 export type UserAuthState = {
@@ -23,21 +29,14 @@ export type UserAuthState = {
     } | null;
 };
 
-type AuthCredentials = {
-    address: string;
-    signature: string;
-    message: string;
-    timestamp: number;
-};
-
-const AUTH_CREDENTIALS_KEY = "spritz_auth_credentials";
-const AUTH_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1000;
 
 // Hook that provides the auth implementation (used by AuthProvider)
 export function useAuthImplementation() {
-    const { address, isConnected } = useAccount();
+    const { address, isConnected, isReconnecting } = useAccount();
     const { signMessageAsync } = useSignMessage();
-    
+
     const [state, setState] = useState<UserAuthState>({
         isLoading: true,
         isAuthenticated: false,
@@ -49,103 +48,88 @@ export function useAuthImplementation() {
     });
 
     const [credentials, setCredentials] = useState<AuthCredentials | null>(null);
-    
+    const credentialsLoaded = useRef(false);
+    const verificationInProgress = useRef(false);
+    const lastVerifiedAddress = useRef<string | null>(null);
+
     // Check if credentials are valid and not expired
     const hasValidCredentials = useMemo(() => {
         if (!credentials?.address || !credentials?.signature || !credentials?.message) {
             return false;
         }
         // Check if credentials are expired
-        if (Date.now() - credentials.timestamp > AUTH_TTL) {
+        if (authStorage.isExpired(credentials, AUTH_TTL)) {
             return false;
         }
         return true;
     }, [credentials]);
 
-    // Track if we've loaded credentials
-    const [credentialsLoaded, setCredentialsLoaded] = useState(false);
-    
-    // Load saved credentials on mount - don't wait for wallet connection
-    // SIWE credentials are self-contained (address + signature + message)
+    // Load saved credentials on mount (async with IndexedDB fallback)
     useEffect(() => {
-        if (typeof window === "undefined" || credentialsLoaded) return;
-        
-        try {
-            const saved = localStorage.getItem(AUTH_CREDENTIALS_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                
-                // Validate the parsed data structure
-                if (
-                    parsed &&
-                    typeof parsed.address === 'string' && parsed.address.trim() &&
-                    typeof parsed.signature === 'string' && parsed.signature.trim() &&
-                    typeof parsed.message === 'string' && parsed.message.trim() &&
-                    typeof parsed.timestamp === 'number' &&
-                    Date.now() - parsed.timestamp < AUTH_TTL
-                ) {
-                    console.log("[Auth] Loaded valid credentials from localStorage");
-                    setCredentials(parsed as AuthCredentials);
-                    setCredentialsLoaded(true);
+        if (typeof window === "undefined" || credentialsLoaded.current) return;
+        credentialsLoaded.current = true;
+
+        const loadCredentials = async () => {
+            try {
+                const saved = await authStorage.load(AUTH_CREDENTIALS_KEY);
+
+                if (saved && !authStorage.isExpired(saved, AUTH_TTL)) {
+                    console.log("[Auth] Loaded valid credentials from storage");
+                    setCredentials(saved);
                 } else {
-                    console.log("[Auth] Invalid or expired credentials, clearing");
-                    localStorage.removeItem(AUTH_CREDENTIALS_KEY);
-                    setCredentials(null);
-                    setCredentialsLoaded(true);
-                    setState(prev => ({ ...prev, isLoading: false }));
+                    if (saved) {
+                        console.log("[Auth] Credentials expired, clearing");
+                        await authStorage.remove(AUTH_CREDENTIALS_KEY);
+                    }
+                    setState((prev) => ({ ...prev, isLoading: false }));
                 }
-            } else {
-                setCredentialsLoaded(true);
-                setState(prev => ({ ...prev, isLoading: false }));
+            } catch (e) {
+                console.error("[Auth] Error loading credentials:", e);
+                await authStorage.remove(AUTH_CREDENTIALS_KEY);
+                setState((prev) => ({ ...prev, isLoading: false }));
             }
-        } catch (e) {
-            console.error("[Auth] Error loading credentials:", e);
-            localStorage.removeItem(AUTH_CREDENTIALS_KEY);
-            setCredentials(null);
-            setCredentialsLoaded(true);
-            setState(prev => ({ ...prev, isLoading: false }));
-        }
-    }, [credentialsLoaded]);
-    
-    // Clear credentials if a different wallet connects (address mismatch)
-    useEffect(() => {
-        if (address && credentials && credentials.address.toLowerCase() !== address.toLowerCase()) {
-            console.log("[Auth] Address mismatch with connected wallet, clearing credentials");
-            localStorage.removeItem(AUTH_CREDENTIALS_KEY);
-            setCredentials(null);
-            setState(prev => ({ ...prev, isAuthenticated: false, user: null, isLoading: false }));
-        }
-    }, [address, credentials]);
+        };
 
-    // Verify credentials when they change
-    // Note: We don't require wallet to be connected - credentials contain the address
+        loadCredentials();
+    }, []);
+
+    // Check for address mismatch - but only after wallet is fully connected (not reconnecting)
+    // This prevents premature credential clearing during reconnection
     useEffect(() => {
-        if (!credentials) {
-            setState(prev => ({ 
-                ...prev, 
+        if (!credentials || !address || isReconnecting) return;
+
+        // Only clear if a DIFFERENT wallet is connected (not during reconnection)
+        if (credentials.address.toLowerCase() !== address.toLowerCase()) {
+            console.log("[Auth] Different wallet connected, clearing credentials");
+            authStorage.remove(AUTH_CREDENTIALS_KEY);
+            setCredentials(null);
+            lastVerifiedAddress.current = null;
+            setState((prev) => ({
+                ...prev,
                 isAuthenticated: false,
-                isBetaTester: false,
-                subscriptionTier: null,
-                subscriptionExpiresAt: null,
                 user: null,
-                isLoading: false 
+                isLoading: false,
             }));
-            return;
         }
+    }, [address, credentials, isReconnecting]);
 
-        const verifyCredentials = async () => {
-            setState(prev => ({ ...prev, isLoading: true, error: null }));
-            
+    // Verify credentials with retry logic
+    const verifyWithRetry = useCallback(
+        async (creds: AuthCredentials, attempt = 1): Promise<boolean> => {
             try {
                 const response = await fetch("/api/auth/verify", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(credentials),
+                    body: JSON.stringify(creds),
                 });
 
                 const data = await response.json();
 
                 if (response.ok && data.verified) {
+                    // Refresh timestamp on successful verification to extend session
+                    await authStorage.refreshTimestamp(AUTH_CREDENTIALS_KEY);
+                    lastVerifiedAddress.current = creds.address;
+
                     setState({
                         isLoading: false,
                         isAuthenticated: true,
@@ -153,20 +137,26 @@ export function useAuthImplementation() {
                         subscriptionTier: data.user?.subscription_tier || "free",
                         subscriptionExpiresAt: data.user?.subscription_expires_at || null,
                         error: null,
-                        user: data.user ? {
-                            id: data.user.id,
-                            walletAddress: data.user.wallet_address,
-                            username: data.user.username,
-                            ensName: data.user.ens_name,
-                            email: data.user.email,
-                            emailVerified: data.user.email_verified,
-                            points: data.user.points || 0,
-                            inviteCount: data.user.invite_count || 0,
-                        } : null,
+                        user: data.user
+                            ? {
+                                  id: data.user.id,
+                                  walletAddress: data.user.wallet_address,
+                                  username: data.user.username,
+                                  ensName: data.user.ens_name,
+                                  email: data.user.email,
+                                  emailVerified: data.user.email_verified,
+                                  points: data.user.points || 0,
+                                  inviteCount: data.user.invite_count || 0,
+                              }
+                            : null,
                     });
-                } else {
-                    // Clear invalid credentials
-                    localStorage.removeItem(AUTH_CREDENTIALS_KEY);
+                    return true;
+                }
+
+                // If signature is invalid, clear credentials
+                if (response.status === 401) {
+                    console.log("[Auth] Invalid signature, clearing credentials");
+                    await authStorage.remove(AUTH_CREDENTIALS_KEY);
                     setCredentials(null);
                     setState({
                         isLoading: false,
@@ -177,28 +167,86 @@ export function useAuthImplementation() {
                         error: data.error || "Authentication failed",
                         user: null,
                     });
+                    return false;
                 }
+
+                // For other errors, retry if we haven't exceeded max attempts
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    console.log(`[Auth] Verification failed, retrying (${attempt}/${MAX_RETRY_ATTEMPTS})...`);
+                    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
+                    return verifyWithRetry(creds, attempt + 1);
+                }
+
+                throw new Error(data.error || "Verification failed after retries");
             } catch (err) {
-                console.error("[Auth] Verification error:", err);
-                setState(prev => ({
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    console.log(`[Auth] Verification error, retrying (${attempt}/${MAX_RETRY_ATTEMPTS})...`);
+                    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
+                    return verifyWithRetry(creds, attempt + 1);
+                }
+
+                console.error("[Auth] Verification error after retries:", err);
+                // Don't clear credentials on network errors - keep trying next time
+                setState((prev) => ({
                     ...prev,
                     isLoading: false,
-                    error: "Verification failed",
+                    error: "Verification failed - please check your connection",
                 }));
+                return false;
+            }
+        },
+        []
+    );
+
+    // Verify credentials when they change
+    useEffect(() => {
+        if (!credentials) {
+            setState((prev) => ({
+                ...prev,
+                isAuthenticated: false,
+                isBetaTester: false,
+                subscriptionTier: null,
+                subscriptionExpiresAt: null,
+                user: null,
+                isLoading: false,
+            }));
+            return;
+        }
+
+        // Skip if already verified for this address and still valid
+        if (
+            lastVerifiedAddress.current === credentials.address.toLowerCase() &&
+            state.isAuthenticated &&
+            hasValidCredentials
+        ) {
+            return;
+        }
+
+        // Skip if already verifying
+        if (verificationInProgress.current) return;
+
+        const verify = async () => {
+            verificationInProgress.current = true;
+            setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+            try {
+                await verifyWithRetry(credentials);
+            } finally {
+                verificationInProgress.current = false;
             }
         };
 
-        verifyCredentials();
-    }, [credentials]);
+        verify();
+    }, [credentials, hasValidCredentials, verifyWithRetry, state.isAuthenticated]);
 
     // Sign in with SIWE
     const signIn = useCallback(async () => {
         if (!address || !isConnected) {
-            setState(prev => ({ ...prev, error: "Wallet not connected" }));
+            setState((prev) => ({ ...prev, error: "Wallet not connected" }));
             return false;
         }
 
-        setState(prev => ({ ...prev, isLoading: true, error: null }));
+        setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
         try {
             // Get message to sign
@@ -213,16 +261,17 @@ export function useAuthImplementation() {
                 signature,
                 message,
                 timestamp: Date.now(),
+                chain: "evm",
             };
 
-            // Save credentials
-            localStorage.setItem(AUTH_CREDENTIALS_KEY, JSON.stringify(newCredentials));
+            // Save credentials to robust storage
+            await authStorage.save(AUTH_CREDENTIALS_KEY, newCredentials);
             setCredentials(newCredentials);
 
             return true;
         } catch (err) {
             console.error("[Auth] Sign in error:", err);
-            setState(prev => ({
+            setState((prev) => ({
                 ...prev,
                 isLoading: false,
                 error: err instanceof Error ? err.message : "Sign in failed",
@@ -232,9 +281,10 @@ export function useAuthImplementation() {
     }, [address, isConnected, signMessageAsync]);
 
     // Sign out
-    const signOut = useCallback(() => {
-        localStorage.removeItem(AUTH_CREDENTIALS_KEY);
+    const signOut = useCallback(async () => {
+        await authStorage.remove(AUTH_CREDENTIALS_KEY);
         setCredentials(null);
+        lastVerifiedAddress.current = null;
         setState({
             isLoading: false,
             isAuthenticated: false,
@@ -249,7 +299,7 @@ export function useAuthImplementation() {
     // Refresh user data without re-signing
     const refresh = useCallback(async () => {
         if (!credentials) return;
-        
+
         try {
             const response = await fetch("/api/auth/verify", {
                 method: "POST",
@@ -260,21 +310,26 @@ export function useAuthImplementation() {
             const data = await response.json();
 
             if (response.ok && data.verified) {
-                setState(prev => ({
+                // Refresh timestamp
+                await authStorage.refreshTimestamp(AUTH_CREDENTIALS_KEY);
+
+                setState((prev) => ({
                     ...prev,
                     isBetaTester: data.user?.beta_access || false,
                     subscriptionTier: data.user?.subscription_tier || "free",
                     subscriptionExpiresAt: data.user?.subscription_expires_at || null,
-                    user: data.user ? {
-                        id: data.user.id,
-                        walletAddress: data.user.wallet_address,
-                        username: data.user.username,
-                        ensName: data.user.ens_name,
-                        email: data.user.email,
-                        emailVerified: data.user.email_verified,
-                        points: data.user.points || 0,
-                        inviteCount: data.user.invite_count || 0,
-                    } : null,
+                    user: data.user
+                        ? {
+                              id: data.user.id,
+                              walletAddress: data.user.wallet_address,
+                              username: data.user.username,
+                              ensName: data.user.ens_name,
+                              email: data.user.email,
+                              emailVerified: data.user.email_verified,
+                              points: data.user.points || 0,
+                              inviteCount: data.user.invite_count || 0,
+                          }
+                        : null,
                 }));
             }
         } catch (err) {
@@ -287,12 +342,12 @@ export function useAuthImplementation() {
         if (!credentials || !hasValidCredentials) {
             return null;
         }
-        
+
         const { address: addr, signature, message } = credentials;
-        
+
         // Base64 encode the message since it contains newlines
         const encodedMessage = btoa(encodeURIComponent(message));
-        
+
         return {
             "x-auth-address": addr,
             "x-auth-signature": signature,
@@ -312,4 +367,3 @@ export function useAuthImplementation() {
         getAuthHeaders,
     };
 }
-

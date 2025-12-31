@@ -14,11 +14,31 @@ import { SpritzLogo } from "@/components/SpritzLogo";
 import { usePasskeyContext } from "@/context/PasskeyProvider";
 import { useWalletType, type WalletType } from "@/hooks/useWalletType";
 import { useAuth } from "@/context/AuthProvider";
+import {
+    AUTH_CREDENTIALS_KEY,
+    SOLANA_AUTH_CREDENTIALS_KEY,
+    AUTH_TTL,
+} from "@/lib/authStorage";
 
 // Check if there's a saved wallet session we should wait for
 function hasSavedWalletSession(): boolean {
     if (typeof window === "undefined") return false;
     try {
+        // Check for our auth credentials first (most reliable indicator)
+        const evmCredentials = localStorage.getItem(AUTH_CREDENTIALS_KEY);
+        if (evmCredentials) {
+            const parsed = JSON.parse(evmCredentials);
+            if (parsed?.address && parsed?.signature && Date.now() - parsed.timestamp < AUTH_TTL) {
+                return true;
+            }
+        }
+        const solanaCredentials = localStorage.getItem(SOLANA_AUTH_CREDENTIALS_KEY);
+        if (solanaCredentials) {
+            const parsed = JSON.parse(solanaCredentials);
+            if (parsed?.address && parsed?.signature && Date.now() - parsed.timestamp < AUTH_TTL) {
+                return true;
+            }
+        }
         // Check for wagmi state (EVM wallets)
         const wagmiState = localStorage.getItem("wagmi.store");
         if (wagmiState) {
@@ -30,15 +50,6 @@ function hasSavedWalletSession(): boolean {
         // Check for @reown appkit state (Solana + EVM)
         for (const key of Object.keys(localStorage)) {
             if (key.startsWith("@reown") || key.startsWith("wc@") || key.includes("walletconnect")) {
-                return true;
-            }
-        }
-        // Check for our SIWE credentials
-        const authCredentials = localStorage.getItem("spritz_auth_credentials");
-        if (authCredentials) {
-            const parsed = JSON.parse(authCredentials);
-            const AUTH_TTL = 7 * 24 * 60 * 60 * 1000;
-            if (parsed?.address && Date.now() - parsed.timestamp < AUTH_TTL) {
                 return true;
             }
         }
@@ -107,14 +118,15 @@ export default function Home() {
             const hasSession = hasSavedSession.current;
             // Use longer delay if we expect a wallet to reconnect
             // PWA force quit can take longer to restore wallet connection
-            const delay = hasSession ? 3000 : 500;
+            // But if we're already authenticated via SIWE, we can be faster
+            const delay = isSiweAuthenticated ? 100 : hasSession ? 4000 : 500;
             
             const timer = setTimeout(() => {
                 setInitializing(false);
             }, delay);
             return () => clearTimeout(timer);
         }
-    }, [mounted]);
+    }, [mounted, isSiweAuthenticated]);
 
     // Clear initializing early if wallet reconnects before timeout
     useEffect(() => {
@@ -153,30 +165,39 @@ export default function Home() {
     }, [mounted, initializing, isWalletConnected, walletAddress, isSiweAuthenticated, isSiweLoading, signingIn, siweSignIn, walletType]);
 
     // Determine the active user address (supports both EVM and Solana)
+    // Can come from passkey (smartAccountAddress), connected wallet, or authenticated SIWE user
     const userAddress: string | null = mounted
-        ? smartAccountAddress || walletAddress || null
+        ? smartAccountAddress || walletAddress || siweUser?.walletAddress || null
         : null;
 
     // Determine wallet type for dashboard
+    // Use connected wallet type, or infer from SIWE user address format
     const activeWalletType: WalletType = isPasskeyAuthenticated
         ? "evm" // Passkey users always use EVM (smart accounts)
-        : walletType;
+        : walletType || (siweUser?.walletAddress?.startsWith("0x") ? "evm" : siweUser?.walletAddress ? "solana" : null);
 
     // Require SIWE/SIWS authentication for all wallet users
+    // Note: We allow SIWE auth even without wallet connected - credentials are self-contained
+    // This enables persistent sessions even if wallet takes time to reconnect
     const isFullyAuthenticated = mounted && (
         isPasskeyAuthenticated || 
-        (isWalletConnected && isSiweAuthenticated)
+        isSiweAuthenticated
     );
 
     // Show loading while checking auth state
-    // Simplified: don't block on EVM sync - auth credentials work independently
+    // If already authenticated via SIWE, don't wait for wallet reconnection
+    // Auth credentials are self-contained and can work without wallet
     const isCheckingAuth =
-        !mounted || initializing || isWalletReconnecting || isPasskeyLoading || isSiweLoading;
+        !mounted || 
+        isPasskeyLoading || 
+        (isSiweLoading && !isSiweAuthenticated) ||
+        (initializing && !isSiweAuthenticated) ||
+        (isWalletReconnecting && !isSiweAuthenticated);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         console.log("[Logout] Starting logout...");
-        // Sign out SIWE
-        siweSignOut();
+        // Sign out SIWE (this also clears auth storage)
+        await siweSignOut();
         // Disconnect wallet (AppKit handles both EVM and Solana)
         try {
             walletDisconnect();
@@ -194,13 +215,20 @@ export default function Home() {
                 k.startsWith("@reown") || 
                 k.startsWith("wc@") ||
                 k.includes("walletconnect") ||
-                k === "spritz_auth_credentials" ||
-                k === "spritz_solana_auth_credentials"
+                k === AUTH_CREDENTIALS_KEY ||
+                k === SOLANA_AUTH_CREDENTIALS_KEY
             );
             keysToRemove.forEach(k => localStorage.removeItem(k));
             console.log("[Logout] Cleared localStorage keys:", keysToRemove.length);
         } catch (e) {
             console.error("[Logout] Clear storage error:", e);
+        }
+        // Clear IndexedDB auth data
+        try {
+            const deleteRequest = indexedDB.deleteDatabase("spritz_auth");
+            deleteRequest.onsuccess = () => console.log("[Logout] Cleared IndexedDB");
+        } catch (e) {
+            console.error("[Logout] IndexedDB clear error:", e);
         }
         // Force reload to get clean state
         window.location.reload();

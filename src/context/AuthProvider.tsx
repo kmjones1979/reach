@@ -8,7 +8,7 @@ import { useWalletType } from "@/hooks/useWalletType";
 // Context for auth state
 type AuthContextType = UserAuthState & {
     signIn: () => Promise<boolean>;
-    signOut: () => void;
+    signOut: () => Promise<void>;
     refresh: () => Promise<void>;
     getAuthHeaders: () => Record<string, string> | null;
     isReady: boolean;
@@ -31,20 +31,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const evmAuth = useAuthImplementation();
     const solanaAuth = useSolanaAuthImplementation();
     
-    // Select the appropriate auth based on wallet type
+    // Select the appropriate auth based on wallet type OR authenticated state
+    // This ensures persistent sessions work even before wallet reconnects
     const auth = useMemo((): AuthContextType => {
-        // If Solana wallet is connected, use Solana auth
-        if (walletType === "solana" && isConnected) {
+        // If Solana wallet is connected OR we have Solana auth, use Solana
+        if ((walletType === "solana" && isConnected) || solanaAuth.isAuthenticated) {
             return {
                 ...solanaAuth,
                 chain: "solana",
             };
         }
         
-        // Default to EVM auth
+        // Default to EVM auth (handles both connected wallet and stored credentials)
         return {
             ...evmAuth,
-            chain: walletType === "evm" ? "evm" : null,
+            chain: evmAuth.isAuthenticated ? "evm" : (walletType === "evm" ? "evm" : null),
         };
     }, [walletType, isConnected, evmAuth, solanaAuth]);
     
