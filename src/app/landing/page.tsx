@@ -268,12 +268,12 @@ export default function LandingPage() {
                             GitHub
                         </a>
                         <a
-                            href="https://twitter.com/spraborern"
+                            href="https://x.com/spritzchat"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-zinc-400 hover:text-white text-sm transition-colors"
                         >
-                            Twitter
+                            X / Twitter
                         </a>
                         <a
                             href="https://app.spritz.chat"
