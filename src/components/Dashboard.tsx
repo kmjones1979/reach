@@ -398,6 +398,7 @@ function DashboardContent({
         rejectRequest,
         cancelRequest,
         removeFriend,
+        updateNickname,
         clearError: clearFriendsError,
         isConfigured: isSupabaseConfigured,
         refresh: refreshFriends,
@@ -2839,6 +2840,7 @@ function DashboardContent({
                                 onVideoCall={handleVideoCall}
                                 onChat={isPasskeyUser ? undefined : handleChat}
                                 onRemove={handleRemoveFriend}
+                                onUpdateNote={updateNickname}
                                 isCallActive={callState !== "idle"}
                                 unreadCounts={
                                     isPasskeyUser
@@ -2926,6 +2928,7 @@ function DashboardContent({
                                 onVideoCall={handleVideoCall}
                                 onChat={isPasskeyUser ? undefined : handleChat}
                                 onRemove={handleRemoveFriend}
+                                onUpdateNote={updateNickname}
                                 isCallActive={callState !== "idle"}
                                 unreadCounts={
                                     isPasskeyUser

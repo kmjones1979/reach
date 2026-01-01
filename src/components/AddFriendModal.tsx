@@ -38,9 +38,25 @@ export function AddFriendModal({
     const { lookupUsername } = useUsername(null);
     const { lookupByPhone } = usePhoneVerification(null);
 
-    // Handle QR scan result
+    // Handle QR scan result - parse URL to extract address if needed
     const handleQRScan = (scannedValue: string) => {
-        setInput(scannedValue);
+        let addressOrInput = scannedValue;
+        
+        // Try to parse as URL and extract the 'add' parameter
+        try {
+            // Check if it's a URL (contains :// or starts with known domains)
+            if (scannedValue.includes('://') || scannedValue.startsWith('app.spritz.chat')) {
+                const url = new URL(scannedValue.startsWith('http') ? scannedValue : `https://${scannedValue}`);
+                const addParam = url.searchParams.get('add');
+                if (addParam) {
+                    addressOrInput = addParam;
+                }
+            }
+        } catch {
+            // Not a valid URL, use as-is
+        }
+        
+        setInput(addressOrInput);
         setShowScanner(false);
     };
 
@@ -374,7 +390,7 @@ export function AddFriendModal({
 
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-400 mb-2">
-                                        Nickname (optional)
+                                        Add note (optional)
                                     </label>
                                     <input
                                         type="text"
@@ -382,7 +398,7 @@ export function AddFriendModal({
                                         onChange={(e) =>
                                             setNickname(e.target.value)
                                         }
-                                        placeholder="Give them a nickname"
+                                        placeholder="e.g. Met at ETH Denver, works at..."
                                         className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all"
                                     />
                                 </div>

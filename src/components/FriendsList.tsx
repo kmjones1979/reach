@@ -37,6 +37,7 @@ type FriendsListProps = {
     onVideoCall?: (friend: Friend) => void;
     onChat?: (friend: Friend) => void;
     onRemove: (friendId: string) => void;
+    onUpdateNote?: (friendId: string, note: string) => Promise<boolean>;
     isCallActive: boolean;
     unreadCounts?: Record<string, number>;
     hideChat?: boolean;
@@ -108,6 +109,7 @@ type FriendCardProps = {
     onToggleExpand: (id: string) => void;
     onToggleFavorite: () => void;
     onEditTag: () => void;
+    onEditNote: () => void;
     onCall: (friend: Friend) => void;
     onVideoCall?: (friend: Friend) => void;
     onChat?: (friend: Friend) => void;
@@ -133,6 +135,7 @@ const FriendCard = memo(function FriendCard({
     onToggleExpand,
     onToggleFavorite,
     onEditTag,
+    onEditNote,
     onCall,
     onVideoCall,
     onChat,
@@ -442,6 +445,27 @@ const FriendCard = memo(function FriendCard({
                 {/* Expanded Options */}
                 {isExpanded && (
                     <div className="mt-3 pt-3 border-t border-zinc-700/50">
+                        {/* Note display */}
+                        {friend.nickname && (
+                            <div className="mb-3 p-3 bg-zinc-800/50 rounded-lg">
+                                <div className="flex items-start gap-2">
+                                    <svg className="w-4 h-4 text-zinc-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    <p className="text-zinc-300 text-sm flex-1">{friend.nickname}</p>
+                                    <button
+                                        onClick={onEditNote}
+                                        className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                                        title="Edit note"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Mobile-only action buttons */}
                         <div className="flex items-center gap-2 mb-3 sm:hidden">
                             {/* Video Call - Mobile */}
@@ -585,8 +609,29 @@ const FriendCard = memo(function FriendCard({
                             </a>
                         )}
 
-                        {/* Tag, Copy & Remove buttons */}
-                        <div className="grid grid-cols-3 gap-2">
+                        {/* Note, Tag, Copy & Remove buttons */}
+                        <div className="grid grid-cols-4 gap-2">
+                            <button
+                                onClick={onEditNote}
+                                className="py-2.5 px-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5"
+                            >
+                                <svg
+                                    className="w-4 h-4 shrink-0"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                    />
+                                </svg>
+                                <span className="truncate hidden sm:inline">
+                                    {friend.nickname ? "Edit" : "Note"}
+                                </span>
+                            </button>
                             <button
                                 onClick={onEditTag}
                                 className="py-2.5 px-2 rounded-lg bg-[#FF5500]/10 hover:bg-[#FF5500]/20 text-[#FFBBA7] text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5"
@@ -604,7 +649,7 @@ const FriendCard = memo(function FriendCard({
                                         d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
                                     />
                                 </svg>
-                                <span className="truncate">
+                                <span className="truncate hidden sm:inline">
                                     {friendTag?.tag || friendTag?.emoji
                                         ? "Edit"
                                         : "Tag"}
@@ -631,7 +676,7 @@ const FriendCard = memo(function FriendCard({
                                         d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                                     />
                                 </svg>
-                                <span className="truncate">Copy</span>
+                                <span className="truncate hidden sm:inline">Copy</span>
                             </button>
                             <button
                                 onClick={() => onRemoveClick(friend)}
@@ -653,7 +698,6 @@ const FriendCard = memo(function FriendCard({
                                 <span className="hidden sm:inline truncate">
                                     Remove
                                 </span>
-                                <span className="sm:hidden">✕</span>
                             </button>
                         </div>
                     </div>
@@ -670,6 +714,7 @@ export function FriendsList({
     onVideoCall,
     onChat,
     onRemove,
+    onUpdateNote,
     isCallActive,
     unreadCounts = {},
     hideChat = false,
@@ -677,6 +722,9 @@ export function FriendsList({
 }: FriendsListProps) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [friendToRemove, setFriendToRemove] = useState<Friend | null>(null);
+    const [noteModalFriend, setNoteModalFriend] = useState<Friend | null>(null);
+    const [noteText, setNoteText] = useState("");
+    const [isSavingNote, setIsSavingNote] = useState(false);
     const [friendStatuses, setFriendStatuses] = useState<
         Record<string, FriendStatus>
     >({});
@@ -1507,6 +1555,10 @@ export function FriendsList({
                                         onEditTag={() =>
                                             setTagModalFriend(friend)
                                         }
+                                        onEditNote={() => {
+                                            setNoteText(friend.nickname || "");
+                                            setNoteModalFriend(friend);
+                                        }}
                                         onCall={onCall}
                                         onVideoCall={onVideoCall}
                                         onChat={onChat}
@@ -1544,6 +1596,10 @@ export function FriendsList({
                                     toggleFavorite(friend.address)
                                 }
                                 onEditTag={() => setTagModalFriend(friend)}
+                                onEditNote={() => {
+                                    setNoteText(friend.nickname || "");
+                                    setNoteModalFriend(friend);
+                                }}
                                 onCall={onCall}
                                 onVideoCall={onVideoCall}
                                 onChat={onChat}
@@ -1659,6 +1715,93 @@ export function FriendsList({
                     }}
                 />
             )}
+
+            {/* Note Edit Modal */}
+            <AnimatePresence>
+                {noteModalFriend && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                        onClick={() => setNoteModalFriend(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full"
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-bold text-white">
+                                    {noteModalFriend.nickname ? "Edit Note" : "Add Note"}
+                                </h3>
+                                <button
+                                    onClick={() => setNoteModalFriend(null)}
+                                    className="text-zinc-500 hover:text-white transition-colors"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <p className="text-zinc-400 text-sm mb-4">
+                                Add a personal note about{" "}
+                                <span className="text-white font-medium">
+                                    {noteModalFriend.reachUsername 
+                                        ? `@${noteModalFriend.reachUsername}` 
+                                        : noteModalFriend.ensName || formatAddress(noteModalFriend.address)}
+                                </span>
+                            </p>
+
+                            <textarea
+                                value={noteText}
+                                onChange={(e) => setNoteText(e.target.value)}
+                                placeholder="e.g. Met at ETH Denver, works at..."
+                                className="w-full py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+                                rows={3}
+                                maxLength={200}
+                            />
+                            <p className="text-zinc-500 text-xs mt-1 text-right">
+                                {noteText.length}/200
+                            </p>
+
+                            <div className="flex gap-3 mt-4">
+                                <button
+                                    onClick={() => setNoteModalFriend(null)}
+                                    className="flex-1 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        if (!onUpdateNote || !noteModalFriend) return;
+                                        setIsSavingNote(true);
+                                        const success = await onUpdateNote(noteModalFriend.id, noteText.trim());
+                                        setIsSavingNote(false);
+                                        if (success) {
+                                            setNoteModalFriend(null);
+                                        }
+                                    }}
+                                    disabled={isSavingNote}
+                                    className="flex-1 py-3 px-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isSavingNote ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        "Save Note"
+                                    )}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
