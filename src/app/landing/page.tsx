@@ -45,7 +45,7 @@ export default function LandingPage() {
                             Privacy
                         </a>
                         <a
-                            href="https://github.com/kmjones1979/spritz"
+                            href="https://github.com/Spritz-Labs/spritz"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-zinc-400 hover:text-white font-medium transition-colors"
@@ -102,7 +102,7 @@ export default function LandingPage() {
                             Launch App →
                         </a>
                         <a
-                            href="https://github.com/kmjones1979/spritz"
+                            href="https://github.com/Spritz-Labs/spritz"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-transparent border border-zinc-700 text-white font-semibold rounded-xl hover:bg-zinc-800 hover:border-zinc-600 transition-all"
@@ -295,7 +295,7 @@ export default function LandingPage() {
                 <div className="max-w-[1200px] mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div className="flex gap-6 flex-wrap justify-center">
                         <a
-                            href="https://github.com/kmjones1979/spritz"
+                            href="https://github.com/Spritz-Labs/spritz"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-zinc-400 hover:text-white text-sm transition-colors"
