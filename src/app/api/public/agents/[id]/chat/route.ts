@@ -33,22 +33,40 @@ async function generateQueryEmbedding(query: string): Promise<number[] | null> {
 
 // Helper to get RAG context from knowledge base
 async function getRAGContext(agentId: string, message: string): Promise<string | null> {
-    if (!supabase || !ai) return null;
+    if (!supabase || !ai) {
+        console.log("[Public RAG] Supabase or AI not configured");
+        return null;
+    }
 
     try {
         // Generate embedding for the query
+        console.log("[Public RAG] Generating embedding for query:", message.substring(0, 50));
         const queryEmbedding = await generateQueryEmbedding(message);
-        if (!queryEmbedding) return null;
+        if (!queryEmbedding) {
+            console.log("[Public RAG] Failed to generate query embedding");
+            return null;
+        }
 
         // Search for relevant chunks
+        console.log("[Public RAG] Searching for chunks for agent:", agentId);
         const { data: chunks, error } = await supabase.rpc("match_knowledge_chunks", {
             p_agent_id: agentId,
             p_query_embedding: `[${queryEmbedding.join(",")}]`,
             p_match_count: 5,
-            p_match_threshold: 0.5
+            p_match_threshold: 0.3 // Lower threshold to get more results
         });
 
-        if (error || !chunks?.length) return null;
+        if (error) {
+            console.error("[Public RAG] Error querying chunks:", error);
+            return null;
+        }
+
+        if (!chunks?.length) {
+            console.log("[Public RAG] No matching chunks found");
+            return null;
+        }
+
+        console.log("[Public RAG] Found", chunks.length, "relevant chunks");
 
         // Format context from matching chunks
         const context = chunks
@@ -57,7 +75,8 @@ async function getRAGContext(agentId: string, message: string): Promise<string |
             .join("\n\n---\n\n");
 
         return context;
-    } catch {
+    } catch (err) {
+        console.error("[Public RAG] Error:", err);
         return null;
     }
 }
@@ -155,10 +174,15 @@ export async function POST(
 
         // Get RAG context if knowledge base is enabled
         let ragContext = "";
+        console.log("[Public Chat] Agent settings - use_knowledge_base:", agent.use_knowledge_base);
         if (agent.use_knowledge_base) {
+            console.log("[Public Chat] Fetching RAG context for message:", message.substring(0, 50));
             const context = await getRAGContext(id, message);
             if (context) {
+                console.log("[Public Chat] Got RAG context, length:", context.length);
                 ragContext = `\n\nRelevant context from knowledge base:\n${context}\n\nUse this context to inform your response when relevant.`;
+            } else {
+                console.log("[Public Chat] No RAG context found");
             }
         }
 
