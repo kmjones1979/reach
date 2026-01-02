@@ -6,7 +6,12 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// GET /api/rooms/[code] - Get room details by join code
+// Helper to check if a string is a wallet address
+function isWalletAddress(str: string): boolean {
+    return /^0x[a-fA-F0-9]{40}$/.test(str);
+}
+
+// GET /api/rooms/[code] - Get room details by join code or wallet address
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ code: string }> }
@@ -16,17 +21,54 @@ export async function GET(
 
         if (!code) {
             return NextResponse.json(
-                { error: "Join code is required" },
+                { error: "Join code or wallet address is required" },
                 { status: 400 }
             );
         }
 
-        // Look up room by join code
-        const { data: room, error } = await supabase
-            .from("shout_instant_rooms")
-            .select("*")
-            .eq("join_code", code.toUpperCase())
-            .single();
+        let room;
+        let error;
+
+        // Check if code is a wallet address (permanent room)
+        if (isWalletAddress(code)) {
+            const normalizedAddress = code.toLowerCase();
+            
+            // Get user's permanent room
+            const { data: user } = await supabase
+                .from("shout_users")
+                .select("permanent_room_id")
+                .eq("wallet_address", normalizedAddress)
+                .single();
+
+            if (user?.permanent_room_id) {
+                // Look up permanent room
+                const result = await supabase
+                    .from("shout_instant_rooms")
+                    .select("*")
+                    .eq("room_id", user.permanent_room_id)
+                    .single();
+                
+                room = result.data;
+                error = result.error;
+            } else {
+                // No permanent room exists yet - trigger creation via permanent endpoint
+                // For now, return 404 - the frontend can call /api/rooms/permanent to create it
+                return NextResponse.json(
+                    { error: "Permanent room not found. Please create it first." },
+                    { status: 404 }
+                );
+            }
+        } else {
+            // Look up room by join code
+            const result = await supabase
+                .from("shout_instant_rooms")
+                .select("*")
+                .eq("join_code", code.toUpperCase())
+                .single();
+            
+            room = result.data;
+            error = result.error;
+        }
 
         if (error || !room) {
             return NextResponse.json(
@@ -35,7 +77,7 @@ export async function GET(
             );
         }
 
-        // Check if room is still active and not expired
+        // Check if room is still active (skip expiration check for permanent rooms)
         if (room.status !== "active") {
             return NextResponse.json(
                 { error: "This room has ended" },
@@ -43,7 +85,8 @@ export async function GET(
             );
         }
 
-        if (new Date(room.expires_at) < new Date()) {
+        // Check expiration (only for non-permanent rooms)
+        if (room.expires_at && new Date(room.expires_at) < new Date()) {
             // Mark as expired
             await supabase
                 .from("shout_instant_rooms")
@@ -73,6 +116,7 @@ export async function GET(
                 participantCount: room.participant_count,
                 expiresAt: room.expires_at,
                 createdAt: room.created_at,
+                isPermanent: !room.expires_at, // Permanent rooms have no expiration
                 host: {
                     address: room.host_wallet_address,
                     displayName: host?.display_name || host?.username || `${room.host_wallet_address.slice(0, 6)}...${room.host_wallet_address.slice(-4)}`,

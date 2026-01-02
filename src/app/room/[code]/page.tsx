@@ -71,8 +71,24 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [code]);
 
+    // Helper to check if code is a wallet address
+    const isWalletAddress = (str: string): boolean => {
+        return /^0x[a-fA-F0-9]{40}$/.test(str);
+    };
+
     const fetchRoom = async () => {
         try {
+            // If it's a wallet address, ensure permanent room exists first
+            if (isWalletAddress(code)) {
+                // Try to get or create permanent room
+                const permanentRes = await fetch(`/api/rooms/permanent?wallet_address=${code}`);
+                if (!permanentRes.ok) {
+                    setError("Failed to get permanent room");
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const res = await fetch(`/api/rooms/${code}`);
             const data = await res.json();
 

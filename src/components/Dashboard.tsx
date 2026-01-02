@@ -3188,6 +3188,75 @@ function DashboardContent({
                             </div>
                         </div>
 
+                        {/* Permanent Room Card */}
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                            <div className="p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                                            <span>🔗</span>
+                                            Your Permanent Meeting Room
+                                        </h2>
+                                        <p className="text-zinc-500 text-sm mt-1">
+                                            Share this link for instant meetings - it never expires
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={`https://app.spritz.chat/room/${userAddress}`}
+                                        readOnly
+                                        className="flex-1 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm font-mono"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                // Ensure permanent room exists
+                                                await fetch(`/api/rooms/permanent?wallet_address=${userAddress}`);
+                                                // Copy URL
+                                                await navigator.clipboard.writeText(`https://app.spritz.chat/room/${userAddress}`);
+                                                // Show feedback
+                                                const btn = document.activeElement as HTMLElement;
+                                                const original = btn?.textContent;
+                                                if (btn) {
+                                                    btn.textContent = "Copied!";
+                                                    setTimeout(() => {
+                                                        if (btn) btn.textContent = original || "Copy";
+                                                    }, 2000);
+                                                }
+                                            } catch (err) {
+                                                console.error("Failed to copy:", err);
+                                                alert("Failed to copy link");
+                                            }
+                                        }}
+                                        className="px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap"
+                                    >
+                                        Copy Link
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                // Ensure permanent room exists
+                                                const res = await fetch(`/api/rooms/permanent?wallet_address=${userAddress}`);
+                                                if (res.ok) {
+                                                    window.open(`https://app.spritz.chat/room/${userAddress}`, "_blank");
+                                                } else {
+                                                    alert("Failed to open room");
+                                                }
+                                            } catch (err) {
+                                                console.error("Failed to open room:", err);
+                                                alert("Failed to open room");
+                                            }
+                                        }}
+                                        className="px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white text-sm rounded-lg transition-all whitespace-nowrap"
+                                    >
+                                        Open Room
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Scheduled Calls Card */}
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
                             <div className="p-6 border-b border-zinc-800">

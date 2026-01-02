@@ -24,7 +24,7 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
     const [selectedDiscoveredAgent, setSelectedDiscoveredAgent] = useState<DiscoveredAgent | null>(null);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(true);
-    const [embedTabForAgent, setEmbedTabForAgent] = useState<Record<string, "iframe" | "js">>({});
+    const [embedTabForAgent, setEmbedTabForAgent] = useState<Record<string, "iframe" | "js" | "react" | "nextjs">>({});
 
     const handleCreateAgent = async (
         name: string,
@@ -555,11 +555,11 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                                 </div>
                                             </div>
 
-                                            {/* Embed Code - Tabs for iframe vs JS SDK */}
+                                            {/* Embed Code - Tabs for iframe, JS, React, Next.js */}
                                             <div>
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <label className="block text-xs text-zinc-400">Embed Code</label>
-                                                    <div className="flex gap-1 bg-zinc-900 rounded-lg p-0.5">
+                                                    <div className="flex flex-wrap gap-1 bg-zinc-900 rounded-lg p-0.5">
                                                         <button
                                                             onClick={() => setEmbedTabForAgent(prev => ({ ...prev, [agent.id]: "iframe" }))}
                                                             className={`px-2 py-1 text-xs rounded transition-colors ${
@@ -579,6 +579,26 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                                             }`}
                                                         >
                                                             JavaScript
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEmbedTabForAgent(prev => ({ ...prev, [agent.id]: "react" }))}
+                                                            className={`px-2 py-1 text-xs rounded transition-colors ${
+                                                                embedTabForAgent[agent.id] === "react"
+                                                                    ? "bg-zinc-800 text-zinc-300"
+                                                                    : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300"
+                                                            }`}
+                                                        >
+                                                            React
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEmbedTabForAgent(prev => ({ ...prev, [agent.id]: "nextjs" }))}
+                                                            className={`px-2 py-1 text-xs rounded transition-colors ${
+                                                                embedTabForAgent[agent.id] === "nextjs"
+                                                                    ? "bg-zinc-800 text-zinc-300"
+                                                                    : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300"
+                                                            }`}
+                                                        >
+                                                            Next.js
                                                         </button>
                                                     </div>
                                                 </div>
@@ -682,6 +702,154 @@ export function AgentsSection({ userAddress }: AgentsSectionProps) {
                                                         </div>
                                                         <p className="text-xs text-zinc-500 mt-1.5">
                                                             Use this JavaScript code for dynamic embedding
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* React Component Embed */}
+                                                {embedTabForAgent[agent.id] === "react" && (
+                                                    <div>
+                                                        <div className="relative">
+                                                            <textarea
+                                                                value={`import React from 'react';
+
+export function SpritzAgent() {
+  return (
+    <iframe
+      src="${publicUrl}"
+      width="100%"
+      height="600"
+      frameBorder="0"
+      allow="clipboard-read; clipboard-write"
+      style={{
+        borderRadius: '12px',
+        border: '1px solid #3f3f46'
+      }}
+      title="Spritz AI Agent"
+    />
+  );
+}`}
+                                                                readOnly
+                                                                rows={15}
+                                                                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-xs font-mono resize-none"
+                                                            />
+                                                            <button
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const reactCode = `import React from 'react';
+
+export function SpritzAgent() {
+  return (
+    <iframe
+      src="${publicUrl}"
+      width="100%"
+      height="600"
+      frameBorder="0"
+      allow="clipboard-read; clipboard-write"
+      style={{
+        borderRadius: '12px',
+        border: '1px solid #3f3f46'
+      }}
+      title="Spritz AI Agent"
+    />
+  );
+}`;
+                                                                        await navigator.clipboard.writeText(reactCode);
+                                                                        const btn = document.activeElement as HTMLElement;
+                                                                        const original = btn?.textContent;
+                                                                        if (btn) {
+                                                                            btn.textContent = "Copied!";
+                                                                            setTimeout(() => {
+                                                                                if (btn) btn.textContent = original || "Copy";
+                                                                            }, 2000);
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Copy failed:", err);
+                                                                    }
+                                                                }}
+                                                                className="absolute top-2 right-2 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-xs rounded transition-colors"
+                                                            >
+                                                                Copy
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-xs text-zinc-500 mt-1.5">
+                                                            Use this React component in your app
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Next.js Component Embed */}
+                                                {embedTabForAgent[agent.id] === "nextjs" && (
+                                                    <div>
+                                                        <div className="relative">
+                                                            <textarea
+                                                                value={`'use client';
+
+import React from 'react';
+
+export default function SpritzAgent() {
+  return (
+    <iframe
+      src="${publicUrl}"
+      width="100%"
+      height="600"
+      frameBorder="0"
+      allow="clipboard-read; clipboard-write"
+      style={{
+        borderRadius: '12px',
+        border: '1px solid #3f3f46'
+      }}
+      title="Spritz AI Agent"
+    />
+  );
+}`}
+                                                                readOnly
+                                                                rows={18}
+                                                                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white text-xs font-mono resize-none"
+                                                            />
+                                                            <button
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const nextjsCode = `'use client';
+
+import React from 'react';
+
+export default function SpritzAgent() {
+  return (
+    <iframe
+      src="${publicUrl}"
+      width="100%"
+      height="600"
+      frameBorder="0"
+      allow="clipboard-read; clipboard-write"
+      style={{
+        borderRadius: '12px',
+        border: '1px solid #3f3f46'
+      }}
+      title="Spritz AI Agent"
+    />
+  );
+}`;
+                                                                        await navigator.clipboard.writeText(nextjsCode);
+                                                                        const btn = document.activeElement as HTMLElement;
+                                                                        const original = btn?.textContent;
+                                                                        if (btn) {
+                                                                            btn.textContent = "Copied!";
+                                                                            setTimeout(() => {
+                                                                                if (btn) btn.textContent = original || "Copy";
+                                                                            }, 2000);
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Copy failed:", err);
+                                                                    }
+                                                                }}
+                                                                className="absolute top-2 right-2 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-xs rounded transition-colors"
+                                                            >
+                                                                Copy
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-xs text-zinc-500 mt-1.5">
+                                                            Use this Next.js component (client component)
                                                         </p>
                                                     </div>
                                                 )}

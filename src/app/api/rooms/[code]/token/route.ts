@@ -52,12 +52,67 @@ export async function POST(
             );
         }
 
-        // Look up room by join code
-        const { data: room, error } = await supabase
-            .from("shout_instant_rooms")
-            .select("*")
-            .eq("join_code", code.toUpperCase())
-            .single();
+        // Helper to check if code is a wallet address
+        const isWalletAddress = (str: string): boolean => {
+            return /^0x[a-fA-F0-9]{40}$/.test(str);
+        };
+
+        let room;
+        let error;
+
+        // Check if code is a wallet address (permanent room)
+        if (isWalletAddress(code)) {
+            const normalizedAddress = code.toLowerCase();
+            
+            // Get user's permanent room
+            const { data: user } = await supabase
+                .from("shout_users")
+                .select("permanent_room_id")
+                .eq("wallet_address", normalizedAddress)
+                .single();
+
+            if (user?.permanent_room_id) {
+                // Look up permanent room
+                const result = await supabase
+                    .from("shout_instant_rooms")
+                    .select("*")
+                    .eq("room_id", user.permanent_room_id)
+                    .single();
+                
+                room = result.data;
+                error = result.error;
+            } else {
+                // No permanent room exists - create it
+                const permanentRes = await fetch(`${request.nextUrl.origin}/api/rooms/permanent?wallet_address=${normalizedAddress}`);
+                if (!permanentRes.ok) {
+                    return NextResponse.json(
+                        { error: "Failed to get permanent room" },
+                        { status: 500 }
+                    );
+                }
+                const permanentData = await permanentRes.json();
+                
+                // Fetch the newly created room
+                const result = await supabase
+                    .from("shout_instant_rooms")
+                    .select("*")
+                    .eq("room_id", permanentData.room.roomId)
+                    .single();
+                
+                room = result.data;
+                error = result.error;
+            }
+        } else {
+            // Look up room by join code
+            const result = await supabase
+                .from("shout_instant_rooms")
+                .select("*")
+                .eq("join_code", code.toUpperCase())
+                .single();
+            
+            room = result.data;
+            error = result.error;
+        }
 
         if (error || !room) {
             return NextResponse.json(
@@ -66,7 +121,7 @@ export async function POST(
             );
         }
 
-        // Check if room is active and not expired
+        // Check if room is active (skip expiration check for permanent rooms)
         if (room.status !== "active") {
             return NextResponse.json(
                 { error: "This room has ended" },
@@ -74,7 +129,8 @@ export async function POST(
             );
         }
 
-        if (new Date(room.expires_at) < new Date()) {
+        // Check expiration (only for non-permanent rooms)
+        if (room.expires_at && new Date(room.expires_at) < new Date()) {
             await supabase
                 .from("shout_instant_rooms")
                 .update({ status: "expired" })
