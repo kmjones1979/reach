@@ -1230,6 +1230,170 @@ export default function SpritzAgent() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* API Documentation Section */}
+                                            <div className="mt-4 pt-4 border-t border-zinc-700/50">
+                                                <h6 className="text-sm font-semibold text-zinc-300 mb-3 flex items-center gap-2">
+                                                    <span>📡</span>
+                                                    API Documentation
+                                                </h6>
+                                                
+                                                <div className="space-y-3 text-xs">
+                                                    {/* Endpoint */}
+                                                    <div>
+                                                        <p className="text-zinc-400 mb-1 font-medium">Endpoint</p>
+                                                        <code className="block px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-orange-400 font-mono break-all">
+                                                            POST https://app.spritz.chat/api/public/agents/{agent.id}/chat
+                                                        </code>
+                                                    </div>
+
+                                                    {/* Request */}
+                                                    <div>
+                                                        <p className="text-zinc-400 mb-1 font-medium">Request Body</p>
+                                                        <div className="relative">
+                                                            <textarea
+                                                                value={JSON.stringify({
+                                                                    message: "Your message here",
+                                                                    sessionId: "optional-session-id"
+                                                                }, null, 2)}
+                                                                readOnly
+                                                                rows={4}
+                                                                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-green-400 font-mono text-xs resize-none"
+                                                            />
+                                                            <button
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const requestBody = JSON.stringify({
+                                                                            message: "Your message here",
+                                                                            sessionId: "optional-session-id"
+                                                                        }, null, 2);
+                                                                        await navigator.clipboard.writeText(requestBody);
+                                                                        const btn = document.activeElement as HTMLElement;
+                                                                        const original = btn?.textContent;
+                                                                        if (btn) {
+                                                                            btn.textContent = "Copied!";
+                                                                            setTimeout(() => {
+                                                                                if (btn) btn.textContent = original || "Copy";
+                                                                            }, 2000);
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Copy failed:", err);
+                                                                    }
+                                                                }}
+                                                                className="absolute top-2 right-2 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-xs rounded transition-colors"
+                                                            >
+                                                                Copy
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Response */}
+                                                    <div>
+                                                        <p className="text-zinc-400 mb-1 font-medium">Response</p>
+                                                        <div className="relative">
+                                                            <textarea
+                                                                value={JSON.stringify({
+                                                                    response: "Agent's response text here"
+                                                                }, null, 2)}
+                                                                readOnly
+                                                                rows={3}
+                                                                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-blue-400 font-mono text-xs resize-none"
+                                                            />
+                                                            <button
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const responseBody = JSON.stringify({
+                                                                            response: "Agent's response text here"
+                                                                        }, null, 2);
+                                                                        await navigator.clipboard.writeText(responseBody);
+                                                                        const btn = document.activeElement as HTMLElement;
+                                                                        const original = btn?.textContent;
+                                                                        if (btn) {
+                                                                            btn.textContent = "Copied!";
+                                                                            setTimeout(() => {
+                                                                                if (btn) btn.textContent = original || "Copy";
+                                                                            }, 2000);
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Copy failed:", err);
+                                                                    }
+                                                                }}
+                                                                className="absolute top-2 right-2 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-xs rounded transition-colors"
+                                                            >
+                                                                Copy
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* cURL Example */}
+                                                    <div>
+                                                        <p className="text-zinc-400 mb-1 font-medium">cURL Example</p>
+                                                        <div className="relative">
+                                                            <textarea
+                                                                value={`curl -X POST https://app.spritz.chat/api/public/agents/${agent.id}/chat \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "message": "Hello!",
+    "sessionId": "my-session-id"
+  }'`}
+                                                                readOnly
+                                                                rows={6}
+                                                                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-cyan-400 font-mono text-xs resize-none"
+                                                            />
+                                                            <button
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const curlExample = `curl -X POST https://app.spritz.chat/api/public/agents/${agent.id}/chat \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "message": "Hello!",
+    "sessionId": "my-session-id"
+  }'`;
+                                                                        await navigator.clipboard.writeText(curlExample);
+                                                                        const btn = document.activeElement as HTMLElement;
+                                                                        const original = btn?.textContent;
+                                                                        if (btn) {
+                                                                            btn.textContent = "Copied!";
+                                                                            setTimeout(() => {
+                                                                                if (btn) btn.textContent = original || "Copy";
+                                                                            }, 2000);
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Copy failed:", err);
+                                                                    }
+                                                                }}
+                                                                className="absolute top-2 right-2 px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-xs rounded transition-colors"
+                                                            >
+                                                                Copy
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Payment Info */}
+                                                    {agent.x402_enabled && (
+                                                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                                            <p className="text-yellow-400 font-medium mb-1">💰 Payment Required</p>
+                                                            <p className="text-zinc-400 text-xs">
+                                                                This agent requires payment. Add the <code className="text-yellow-400">X-Payment</code> header with payment details.
+                                                                Price: <span className="text-yellow-400 font-mono">${((agent.x402_price_cents || 0) / 100).toFixed(2)}</span> per message
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Notes */}
+                                                    <div className="p-3 bg-zinc-800/50 rounded-lg">
+                                                        <p className="text-zinc-300 font-medium mb-2">Notes:</p>
+                                                        <ul className="text-zinc-400 space-y-1 text-xs list-disc list-inside">
+                                                            <li><code className="text-zinc-300">sessionId</code> is optional but recommended for conversation context</li>
+                                                            <li>Responses are streamed in real-time</li>
+                                                            <li>Rate limits may apply for high-volume usage</li>
+                                                            {agent.x402_enabled && (
+                                                                <li>Payment must be included in <code className="text-zinc-300">X-Payment</code> header for each request</li>
+                                                            )}
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     );
                                 })}
