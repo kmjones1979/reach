@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import Link from "next/link";
 import { huddle01ProjectId, isHuddle01Configured } from "@/config/huddle01";
 import { InstantRoomChat } from "@/components/InstantRoomChat";
+import { useWalletType } from "@/hooks/useWalletType";
 
 type RoomInfo = {
     id: string;
@@ -40,18 +41,21 @@ async function loadHuddle01SDK(): Promise<void> {
 
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
     const { code } = use(params);
+    const { address: userWalletAddress } = useWalletType();
     const [room, setRoom] = useState<RoomInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [displayName, setDisplayName] = useState("");
     const [joiningRoom, setJoiningRoom] = useState(false);
     const [inCall, setInCall] = useState(false);
+    const [isHost, setIsHost] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [remotePeers, setRemotePeers] = useState<Map<string, RemotePeer>>(new Map());
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [unreadMessages, setUnreadMessages] = useState(0);
+    const [selectedPeerMenu, setSelectedPeerMenu] = useState<string | null>(null);
     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const clientRef = useRef<any>(null);
@@ -98,7 +102,10 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
             const tokenRes = await fetch(`/api/rooms/${code}/token`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ displayName: displayName.trim() }),
+                body: JSON.stringify({ 
+                    displayName: displayName.trim(),
+                    walletAddress: userWalletAddress || null,
+                }),
             });
 
             const tokenData = await tokenRes.json();
@@ -109,6 +116,9 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                 setJoiningRoom(false);
                 return;
             }
+
+            // Store host status
+            setIsHost(tokenData.isHost || false);
 
             console.log("[Room] Loading Huddle01 SDK...");
             
@@ -516,6 +526,55 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
         return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     };
 
+    // Kick/remove a participant (host only)
+    const handleKickPeer = useCallback(async (peerId: string) => {
+        if (!isHost || !clientRef.current) return;
+        
+        try {
+            console.log("[Room] Kicking peer:", peerId);
+            
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const room = clientRef.current.room as any;
+            
+            // Try different methods to kick a peer
+            if (room.kickPeer) {
+                await room.kickPeer(peerId);
+            } else if (room.removePeer) {
+                await room.removePeer(peerId);
+            } else if (room.closePeerConnection) {
+                await room.closePeerConnection(peerId);
+            } else {
+                // Fallback: try to get the peer and close their connection
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const remotePeers = room.remotePeers;
+                if (remotePeers) {
+                    const peer = remotePeers.get(peerId);
+                    if (peer) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const peerAny = peer as any;
+                        if (peerAny.close) {
+                            await peerAny.close();
+                        }
+                    }
+                }
+                console.warn("[Room] No kick method available, peer may not be removed");
+            }
+            
+            // Remove from our local state
+            setRemotePeers(prev => {
+                const updated = new Map(prev);
+                updated.delete(peerId);
+                return updated;
+            });
+            remoteVideoRefs.current.delete(peerId);
+            remoteAudioRefs.current.delete(peerId);
+            setSelectedPeerMenu(null);
+            
+        } catch (err) {
+            console.error("[Room] Error kicking peer:", err);
+        }
+    }, [isHost]);
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -667,6 +726,11 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                                 <span className="px-2 py-1 bg-black/60 rounded-lg text-white text-xs sm:text-sm">
                                     {displayName} (You)
                                 </span>
+                                {isHost && (
+                                    <span className="px-2 py-1 bg-orange-500/80 rounded-lg text-white text-xs font-medium">
+                                        👑 Host
+                                    </span>
+                                )}
                                 {isMuted && (
                                     <span className="px-2 py-1 bg-red-500/80 rounded-lg text-white text-xs">
                                         🔇
@@ -730,6 +794,56 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                                             {peer.displayName}
                                         </span>
                                     </div>
+                                    
+                                    {/* Host Controls - Menu Button */}
+                                    {isHost && (
+                                        <div className="absolute top-3 right-3">
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedPeerMenu(
+                                                            selectedPeerMenu === peer.peerId ? null : peer.peerId
+                                                        );
+                                                    }}
+                                                    className="p-2 bg-black/60 hover:bg-black/80 rounded-lg text-white transition-colors"
+                                                    title="Manage participant"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                                    </svg>
+                                                </button>
+                                                
+                                                {/* Dropdown Menu */}
+                                                <AnimatePresence>
+                                                    {selectedPeerMenu === peer.peerId && (
+                                                        <>
+                                                            <div
+                                                                className="fixed inset-0 z-40"
+                                                                onClick={() => setSelectedPeerMenu(null)}
+                                                            />
+                                                            <motion.div
+                                                                initial={{ opacity: 0, y: -10 }}
+                                                                animate={{ opacity: 1, y: 0 }}
+                                                                exit={{ opacity: 0, y: -10 }}
+                                                                className="absolute right-0 top-full mt-2 w-48 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden"
+                                                            >
+                                                                <button
+                                                                    onClick={() => handleKickPeer(peer.peerId)}
+                                                                    className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+                                                                    </svg>
+                                                                    <span className="text-sm font-medium">Remove from room</span>
+                                                                </button>
+                                                            </motion.div>
+                                                        </>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        </div>
+                                    )}
                                 </motion.div>
                             ))}
                         </AnimatePresence>
