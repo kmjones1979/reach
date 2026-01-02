@@ -164,9 +164,10 @@ export function InstantRoomChat({
                 symKey: symmetricKeyRef.current,
             });
 
-            // Create decoder and subscribe to messages
+            // Create decoder and subscribe to messages (must include routingInfo like encoder)
             const decoder = wakuEncryption.createDecoder(
                 contentTopic,
+                routingInfo,
                 symmetricKeyRef.current
             );
 
@@ -314,7 +315,7 @@ export function InstantRoomChat({
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
-                    className="absolute right-0 top-0 bottom-0 w-80 bg-zinc-900/95 backdrop-blur-sm border-l border-zinc-800 flex flex-col z-10"
+                    className="w-full sm:w-80 flex-shrink-0 bg-zinc-900/95 backdrop-blur-sm border-l border-zinc-800 flex flex-col z-10"
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between p-3 border-b border-zinc-800">

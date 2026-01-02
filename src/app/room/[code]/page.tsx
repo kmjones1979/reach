@@ -553,34 +553,43 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     if (inCall) {
         const remotePeerArray = Array.from(remotePeers.values());
         const hasRemotePeers = remotePeerArray.length > 0;
+        const totalParticipants = remotePeerArray.length + 1;
+        
+        // Calculate grid layout based on participants
+        const getGridClass = () => {
+            if (totalParticipants === 1) return "grid-cols-1";
+            if (totalParticipants === 2) return "grid-cols-2";
+            if (totalParticipants <= 4) return "grid-cols-2 grid-rows-2";
+            return "grid-cols-2 grid-rows-2"; // Max 4 shown
+        };
         
         return (
-            <div className="min-h-screen bg-zinc-950 flex flex-col relative">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <div className="h-screen h-[100dvh] bg-zinc-950 flex flex-col overflow-hidden">
+                {/* Header - fixed height */}
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-800">
                     <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-white font-medium">{room.title}</span>
-                        <span className="text-zinc-500 text-sm">{formatDuration(callDuration)}</span>
+                        <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                        <span className="text-white font-medium text-sm truncate max-w-[150px]">{room.title}</span>
+                        <span className="text-zinc-500 text-xs">{formatDuration(callDuration)}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-zinc-400">
-                        <span>👥 {remotePeerArray.length + 1}</span>
-                        <span>🔗 {room.joinCode}</span>
-                        {/* Chat Toggle in Header for mobile */}
+                    <div className="flex items-center gap-2 text-xs text-zinc-400">
+                        <span>👥 {totalParticipants}</span>
+                        <span className="hidden sm:inline">🔗 {room.joinCode}</span>
+                        {/* Chat Toggle in Header */}
                         <button
                             onClick={() => setIsChatOpen(!isChatOpen)}
-                            className={`relative p-2 rounded-lg transition-colors ${
+                            className={`relative p-1.5 rounded-lg transition-colors ${
                                 isChatOpen 
                                     ? "bg-orange-500/20 text-orange-400" 
                                     : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
                             }`}
                             title="Toggle chat"
                         >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
                             {unreadMessages > 0 && !isChatOpen && (
-                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 rounded-full text-xs text-white flex items-center justify-center font-medium">
+                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full text-[10px] text-white flex items-center justify-center font-medium">
                                     {unreadMessages > 9 ? "9+" : unreadMessages}
                                 </span>
                             )}
@@ -588,17 +597,13 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                     </div>
                 </div>
 
-                {/* Main content area with chat sidebar */}
-                <div className="flex-1 flex overflow-hidden relative">
-                    {/* Video Area */}
-                    <div className={`flex-1 p-4 overflow-hidden transition-all ${isChatOpen ? "pr-0 sm:pr-4" : ""}`}>
-                        <div className={`h-full grid gap-4 ${
-                            hasRemotePeers 
-                                ? remotePeerArray.length === 1 
-                                    ? "grid-cols-2" 
-                                    : "grid-cols-2 grid-rows-2"
-                                : "grid-cols-1"
-                        }`}>
+                {/* Main content area - fills remaining space */}
+                <div className="flex-1 flex min-h-0 overflow-hidden">
+                    {/* Video Area - shrinks when chat is open */}
+                    <div className={`p-2 sm:p-3 overflow-hidden transition-all duration-300 ${
+                        isChatOpen ? "flex-1 sm:w-[calc(100%-320px)]" : "flex-1"
+                    }`}>
+                        <div className={`h-full grid gap-2 sm:gap-3 ${getGridClass()}`}>
                         {/* Local Video */}
                         <div className="relative bg-zinc-900 rounded-2xl overflow-hidden">
                             {!isVideoOff ? (
@@ -716,13 +721,13 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                     />
                 </div>
 
-                {/* Controls */}
-                <div className="p-4 border-t border-zinc-800">
-                    <div className="flex items-center justify-center gap-4">
+                {/* Controls - fixed height */}
+                <div className="flex-shrink-0 px-4 py-3 border-t border-zinc-800">
+                    <div className="flex items-center justify-center gap-3">
                         {/* Mic Toggle */}
                         <button
                             onClick={toggleMute}
-                            className={`p-4 rounded-full transition-all ${
+                            className={`p-3 rounded-full transition-all ${
                                 !isMuted
                                     ? "bg-zinc-800 hover:bg-zinc-700 text-white"
                                     : "bg-red-500 hover:bg-red-600 text-white"
@@ -730,11 +735,11 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                             title={isMuted ? "Unmute" : "Mute"}
                         >
                             {!isMuted ? (
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                                 </svg>
                             ) : (
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
                                 </svg>
@@ -744,7 +749,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                         {/* Camera Toggle */}
                         <button
                             onClick={toggleVideo}
-                            className={`p-4 rounded-full transition-all ${
+                            className={`p-3 rounded-full transition-all ${
                                 !isVideoOff
                                     ? "bg-zinc-800 hover:bg-zinc-700 text-white"
                                     : "bg-red-500 hover:bg-red-600 text-white"
@@ -752,11 +757,11 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                             title={isVideoOff ? "Turn on camera" : "Turn off camera"}
                         >
                             {!isVideoOff ? (
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                 </svg>
                             ) : (
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                                 </svg>
                             )}
@@ -765,18 +770,18 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                         {/* Chat Toggle */}
                         <button
                             onClick={() => setIsChatOpen(!isChatOpen)}
-                            className={`relative p-4 rounded-full transition-all ${
+                            className={`relative p-3 rounded-full transition-all hidden sm:block ${
                                 isChatOpen 
                                     ? "bg-orange-500 hover:bg-orange-600 text-white" 
                                     : "bg-zinc-800 hover:bg-zinc-700 text-white"
                             }`}
                             title={isChatOpen ? "Close chat" : "Open chat"}
                         >
-                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
                             {unreadMessages > 0 && !isChatOpen && (
-                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 rounded-full text-xs text-white flex items-center justify-center font-medium animate-pulse">
+                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full text-[10px] text-white flex items-center justify-center font-medium animate-pulse">
                                     {unreadMessages > 9 ? "9+" : unreadMessages}
                                 </span>
                             )}
@@ -785,16 +790,16 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                         {/* Leave Call */}
                         <button
                             onClick={handleLeave}
-                            className="p-4 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all"
+                            className="p-3 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all"
                             title="Leave meeting"
                         >
-                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
                             </svg>
                         </button>
                     </div>
-                    <p className="text-center text-xs text-zinc-500 mt-4">
-                        Share this code to invite others: <span className="font-mono text-orange-400">{room.joinCode}</span>
+                    <p className="text-center text-xs text-zinc-500 mt-2 hidden sm:block">
+                        Share: <span className="font-mono text-orange-400">{room.joinCode}</span>
                     </p>
                 </div>
             </div>
