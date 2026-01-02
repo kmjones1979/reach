@@ -263,6 +263,13 @@ export default function PrivacyPage() {
                             <strong>Data We Do NOT Access:</strong> Event names, event descriptions, attendee lists, event locations,
                             attachments, or any other Google account data.
                         </p>
+                        <p className="text-zinc-300 leading-relaxed mt-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                            <strong className="text-orange-400">Data Sharing & AI Disclosure:</strong> Google Calendar data obtained via the Google Calendar API 
+                            is <strong>NEVER</strong> shared with, transferred to, or disclosed to any third parties. Specifically, Google Calendar data 
+                            is <strong>NEVER</strong> sent to any AI/LLM services, including our AI agents feature. The calendar integration 
+                            operates completely independently from our AI features. Google Calendar data is used solely within Spritz 
+                            to display your availability to other Spritz users for scheduling purposes.
+                        </p>
                         <p className="text-zinc-300 leading-relaxed mt-3">
                             <strong>Disconnecting:</strong> You can disconnect your Google Calendar at any time from your Spritz settings.
                             When disconnected, we immediately delete your stored OAuth tokens.
@@ -322,7 +329,57 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-2xl font-semibold mb-4">5. Data Security</h2>
+                        <h2 className="text-2xl font-semibold mb-4">5. Data Sharing, Transfer, and Disclosure</h2>
+                        <p className="text-zinc-300 leading-relaxed mb-4">
+                            Spritz is committed to protecting your data. Here is exactly how we handle data sharing:
+                        </p>
+                        
+                        <h3 className="text-xl font-semibold mb-3 mt-6">5.1 Google User Data</h3>
+                        <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700 mb-4">
+                            <p className="text-zinc-300 leading-relaxed">
+                                <strong className="text-orange-400">We do NOT share, transfer, or disclose Google user data to any third parties.</strong>
+                            </p>
+                            <ul className="list-disc list-inside text-zinc-300 space-y-2 ml-4 mt-3">
+                                <li>Google Calendar data is <strong>NEVER</strong> sent to AI/LLM services (including Google Gemini)</li>
+                                <li>Google Calendar data is <strong>NEVER</strong> used to train AI models</li>
+                                <li>Google Calendar data is <strong>NEVER</strong> sold or shared with advertisers</li>
+                                <li>Google Calendar data is used <strong>ONLY</strong> within Spritz to display availability for scheduling</li>
+                            </ul>
+                        </div>
+                        
+                        <h3 className="text-xl font-semibold mb-3 mt-6">5.2 Data Segregation</h3>
+                        <p className="text-zinc-300 leading-relaxed">
+                            Spritz maintains complete data segregation between our features:
+                        </p>
+                        <ul className="list-disc list-inside text-zinc-300 space-y-2 ml-4 mt-2">
+                            <li>
+                                <strong>Calendar Feature:</strong> Operates independently using only Google Calendar API data. 
+                                This data never leaves the calendar feature context.
+                            </li>
+                            <li>
+                                <strong>AI Agents Feature:</strong> Uses only user-provided messages and knowledge base URLs. 
+                                AI agents have no access to Google Calendar data.
+                            </li>
+                        </ul>
+                        
+                        <h3 className="text-xl font-semibold mb-3 mt-6">5.3 Third-Party Service Providers</h3>
+                        <p className="text-zinc-300 leading-relaxed">
+                            We use the following service providers to operate Spritz. These providers process data only as necessary 
+                            to provide their services and are contractually obligated to protect your data:
+                        </p>
+                        <ul className="list-disc list-inside text-zinc-300 space-y-2 ml-4 mt-2">
+                            <li><strong>Supabase:</strong> Database hosting (account data, preferences)</li>
+                            <li><strong>Huddle01:</strong> Video call infrastructure (call metadata only)</li>
+                            <li><strong>Livepeer:</strong> Livestream processing (stream content)</li>
+                            <li><strong>Google Gemini:</strong> AI responses (user-provided messages only, NOT Google Calendar data)</li>
+                        </ul>
+                        <p className="text-zinc-300 leading-relaxed mt-3">
+                            <strong>Important:</strong> Google Calendar data is NOT shared with any of these providers.
+                        </p>
+                    </section>
+
+                    <section>
+                        <h2 className="text-2xl font-semibold mb-4">6. Data Security</h2>
                         <p className="text-zinc-300 leading-relaxed">
                             We implement appropriate technical and organizational measures to protect your personal
                             information. However, no method of transmission over the Internet or electronic storage is
@@ -337,7 +394,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-2xl font-semibold mb-4">6. Your Rights</h2>
+                        <h2 className="text-2xl font-semibold mb-4">7. Your Rights</h2>
                         <p className="text-zinc-300 leading-relaxed mb-4">You have the right to:</p>
                         <ul className="list-disc list-inside text-zinc-300 space-y-2 ml-4">
                             <li>
@@ -367,7 +424,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-2xl font-semibold mb-4">7. Data Retention</h2>
+                        <h2 className="text-2xl font-semibold mb-4">8. Data Retention</h2>
                         <p className="text-zinc-300 leading-relaxed">
                             We retain your personal data for as long as necessary to provide our services and comply
                             with legal obligations. If you delete your account or request data deletion, we will delete
@@ -377,7 +434,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-2xl font-semibold mb-4">8. Children's Privacy</h2>
+                        <h2 className="text-2xl font-semibold mb-4">9. Children's Privacy</h2>
                         <p className="text-zinc-300 leading-relaxed">
                             Spritz is not intended for users under the age of 18. We do not knowingly collect personal
                             information from children. If you believe we have collected information from a child, please
@@ -386,7 +443,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-2xl font-semibold mb-4">9. International Data Transfers</h2>
+                        <h2 className="text-2xl font-semibold mb-4">10. International Data Transfers</h2>
                         <p className="text-zinc-300 leading-relaxed">
                             Your information may be transferred to and processed in countries other than your country
                             of residence. These countries may have data protection laws that differ from those in your
@@ -395,7 +452,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-2xl font-semibold mb-4">10. Changes to This Privacy Policy</h2>
+                        <h2 className="text-2xl font-semibold mb-4">11. Changes to This Privacy Policy</h2>
                         <p className="text-zinc-300 leading-relaxed">
                             We may update this Privacy Policy from time to time. We will notify you of any changes by
                             posting the new Privacy Policy on this page and updating the "Last updated" date. You are
@@ -404,7 +461,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-2xl font-semibold mb-4">11. Contact Us</h2>
+                        <h2 className="text-2xl font-semibold mb-4">12. Contact Us</h2>
                         <p className="text-zinc-300 leading-relaxed mb-4">
                             If you have any questions about this Privacy Policy or wish to exercise your rights, please
                             contact us:
@@ -432,7 +489,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-2xl font-semibold mb-4">12. Blockchain and Decentralization</h2>
+                        <h2 className="text-2xl font-semibold mb-4">13. Blockchain and Decentralization</h2>
                         <p className="text-zinc-300 leading-relaxed">
                             Spritz leverages blockchain technology and decentralized protocols. Please note that:
                         </p>
