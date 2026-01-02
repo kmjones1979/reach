@@ -18,6 +18,7 @@ import { IncomingCallModal } from "./IncomingCallModal";
 import { ChatModal } from "./ChatModal";
 import { CallHistory } from "./CallHistory";
 import { ScheduledCalls } from "./ScheduledCalls";
+import { NewScheduledCallModal } from "./NewScheduledCallModal";
 import { useCallHistory } from "@/hooks/useCallHistory";
 import { BrowseChannelsModal } from "./BrowseChannelsModal";
 import { ChannelChatModal } from "./ChannelChatModal";
@@ -521,6 +522,8 @@ function DashboardContent({
     const [currentCallId, setCurrentCallId] = useState<string | null>(null);
     const [callStartTime, setCallStartTime] = useState<Date | null>(null);
     const [showNewCallDropdown, setShowNewCallDropdown] = useState(false);
+    const [showNewScheduledModal, setShowNewScheduledModal] = useState(false);
+    const [showNewCallModal, setShowNewCallModal] = useState(false);
     const [isRejectingCall, setIsRejectingCall] = useState(false);
     
     // Live streaming
@@ -3140,7 +3143,7 @@ function DashboardContent({
                         {/* Call History Card */}
                         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
                             <div className="p-6 border-b border-zinc-800">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between mb-4">
                                     <div>
                                         <h2 className="text-xl font-bold text-white flex items-center gap-2">
                                             📞 Call History
@@ -3149,104 +3152,65 @@ function DashboardContent({
                                             Voice and video calls with friends
                                         </p>
                                     </div>
-                                    {/* Quick call button */}
-                                    <div className="relative">
-                                        <button
-                                            onClick={() => setShowNewCallDropdown(!showNewCallDropdown)}
-                                            className="py-2 px-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all flex items-center gap-2"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                            </svg>
-                                            New
-                                        </button>
-                                        {/* Dropdown with options */}
-                                        <AnimatePresence>
-                                            {showNewCallDropdown && (
-                                                <>
-                                                    {/* Backdrop to close dropdown */}
-                                                    <div 
-                                                        className="fixed inset-0 z-40" 
-                                                        onClick={() => setShowNewCallDropdown(false)}
-                                                    />
-                                                    <motion.div 
-                                                        initial={{ opacity: 0, y: -10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        exit={{ opacity: 0, y: -10 }}
-                                                        className="absolute right-0 top-full mt-2 w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto"
-                                                    >
-                                                        <div className="p-2">
-                                                            {/* Instant Room Option */}
-                                                            <button
-                                                                onClick={async () => {
-                                                                    setShowNewCallDropdown(false);
-                                                                    try {
-                                                                        const res = await fetch("/api/rooms", {
-                                                                            method: "POST",
-                                                                            headers: { "Content-Type": "application/json" },
-                                                                            body: JSON.stringify({
-                                                                                hostWalletAddress: userAddress,
-                                                                                title: "Quick Meeting",
-                                                                            }),
-                                                                        });
-                                                                        const data = await res.json();
-                                                                        if (res.ok && data.room) {
-                                                                            // Copy link to clipboard and show notification
-                                                                            navigator.clipboard.writeText(data.room.joinUrl);
-                                                                            // Open the room in a new tab
-                                                                            window.open(data.room.joinUrl, "_blank");
-                                                                        } else {
-                                                                            alert(data.error || "Failed to create room");
-                                                                        }
-                                                                    } catch {
-                                                                        alert("Failed to create room");
-                                                                    }
-                                                                }}
-                                                                className="w-full flex items-center gap-3 p-3 hover:bg-zinc-800 rounded-lg transition-colors mb-1"
-                                                            >
-                                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-lg">
-                                                                    🔗
-                                                                </div>
-                                                                <div className="text-left">
-                                                                    <p className="text-sm font-medium text-white">Instant Room</p>
-                                                                    <p className="text-xs text-zinc-500">Share link, no login needed</p>
-                                                                </div>
-                                                            </button>
+                                </div>
+                                
+                                {/* Three New Call Buttons */}
+                                <div className="flex flex-wrap gap-2">
+                                    {/* New Instant Room */}
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const res = await fetch("/api/rooms", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({
+                                                        hostWalletAddress: userAddress,
+                                                        title: "Quick Meeting",
+                                                    }),
+                                                });
+                                                const data = await res.json();
+                                                if (res.ok && data.room) {
+                                                    // Copy link to clipboard
+                                                    navigator.clipboard.writeText(data.room.joinUrl);
+                                                    // Open the room in a new tab
+                                                    window.open(data.room.joinUrl, "_blank");
+                                                } else {
+                                                    alert(data.error || "Failed to create room");
+                                                }
+                                            } catch {
+                                                alert("Failed to create room");
+                                            }
+                                        }}
+                                        className="flex-1 min-w-[120px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        New Instant
+                                    </button>
 
-                                                            {friendsListData.length > 0 && (
-                                                                <>
-                                                                    <div className="border-t border-zinc-800 my-2" />
-                                                                    <p className="text-xs text-zinc-500 px-2 py-1">Call a friend</p>
-                                                                    {friendsListData.slice(0, 8).map((friend) => (
-                                                                        <button
-                                                                            key={friend.id}
-                                                                            onClick={() => {
-                                                                                setShowNewCallDropdown(false);
-                                                                                handleCall(friend, false);
-                                                                            }}
-                                                                            disabled={callState !== "idle"}
-                                                                            className="w-full flex items-center gap-3 p-2 hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
-                                                                        >
-                                                                            {friend.avatar ? (
-                                                                                <img src={friend.avatar} alt="" className="w-8 h-8 rounded-full" />
-                                                                            ) : (
-                                                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-xs text-white">
-                                                                                    {(friend.nickname || friend.reachUsername || friend.ensName || friend.address)?.[0]?.toUpperCase() || "?"}
-                                                                                </div>
-                                                                            )}
-                                                                            <span className="text-sm text-white truncate">
-                                                                                {friend.nickname || friend.reachUsername || friend.ensName || `${friend.address.slice(0, 6)}...${friend.address.slice(-4)}`}
-                                                                            </span>
-                                                                        </button>
-                                                                    ))}
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </motion.div>
-                                                </>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
+                                    {/* New Scheduled */}
+                                    <button
+                                        onClick={() => setShowNewScheduledModal(true)}
+                                        className="flex-1 min-w-[120px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium hover:shadow-lg hover:shadow-orange-500/25 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        New Scheduled
+                                    </button>
+
+                                    {/* New Call */}
+                                    <button
+                                        onClick={() => setShowNewCallModal(true)}
+                                        disabled={callState !== "idle" || friendsListData.length === 0}
+                                        className="flex-1 min-w-[120px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        New Call
+                                    </button>
                                 </div>
                             </div>
                             <div className="p-6">
@@ -3585,6 +3549,94 @@ function DashboardContent({
                 reachUsername={reachUsername || null}
                 avatar={userENS.avatar}
             />
+
+            {/* New Scheduled Call Modal */}
+            <NewScheduledCallModal
+                isOpen={showNewScheduledModal}
+                onClose={() => setShowNewScheduledModal(false)}
+                userAddress={userAddress}
+            />
+
+            {/* New Call Modal - Friend Selection */}
+            <AnimatePresence>
+                {showNewCallModal && (
+                    <>
+                        <div
+                            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+                            onClick={() => setShowNewCallModal(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                            onClick={() => setShowNewCallModal(false)}
+                        >
+                            <div
+                                className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="p-6 border-b border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                        <h2 className="text-xl font-bold text-white">Call a Friend</h2>
+                                        <button
+                                            onClick={() => setShowNewCallModal(false)}
+                                            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                                        >
+                                            <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="p-4 max-h-96 overflow-y-auto">
+                                    {friendsListData.length === 0 ? (
+                                        <div className="text-center py-8">
+                                            <p className="text-zinc-400">No friends to call</p>
+                                            <p className="text-zinc-500 text-sm mt-2">Add friends to start calling</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {friendsListData.map((friend) => (
+                                                <button
+                                                    key={friend.id}
+                                                    onClick={() => {
+                                                        setShowNewCallModal(false);
+                                                        handleCall(friend, false);
+                                                    }}
+                                                    disabled={callState !== "idle"}
+                                                    className="w-full flex items-center gap-3 p-3 hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    {friend.avatar ? (
+                                                        <img src={friend.avatar} alt="" className="w-10 h-10 rounded-full" />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-sm text-white">
+                                                            {(friend.nickname || friend.reachUsername || friend.ensName || friend.address)?.[0]?.toUpperCase() || "?"}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 text-left">
+                                                        <p className="text-sm font-medium text-white">
+                                                            {friend.nickname || friend.reachUsername || friend.ensName || `${friend.address.slice(0, 6)}...${friend.address.slice(-4)}`}
+                                                        </p>
+                                                        {(friend.reachUsername || friend.ensName) && (
+                                                            <p className="text-xs text-zinc-500">
+                                                                {friend.address.slice(0, 6)}...{friend.address.slice(-4)}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                    </svg>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
 
             {/* Socials Modal */}
             <SocialsModal
