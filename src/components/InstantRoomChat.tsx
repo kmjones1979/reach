@@ -262,12 +262,27 @@ export function InstantRoomChat({
 
         const messageId = generateMessageId();
         const timestamp = Date.now();
+        const content = inputValue.trim();
+
+        // Add to seen BEFORE sending to prevent duplicate when message comes back
+        seenMessageIds.current.add(messageId);
+        
+        // Add to local state immediately (optimistic update)
+        const newMessage: Message = {
+            id: messageId,
+            sender: displayName,
+            content,
+            timestamp,
+            isMe: true,
+        };
+        setMessages((prev) => [...prev, newMessage]);
+        setInputValue("");
 
         try {
             const messageObj = ChatMessage.create({
                 timestamp,
                 sender: displayName,
-                content: inputValue.trim(),
+                content,
                 messageId,
             });
 
@@ -276,19 +291,6 @@ export function InstantRoomChat({
             await nodeRef.current.lightPush.send(encoderRef.current, {
                 payload,
             });
-
-            // Add to local state immediately
-            const newMessage: Message = {
-                id: messageId,
-                sender: displayName,
-                content: inputValue.trim(),
-                timestamp,
-                isMe: true,
-            };
-
-            seenMessageIds.current.add(messageId);
-            setMessages((prev) => [...prev, newMessage]);
-            setInputValue("");
         } catch (err) {
             console.error("[InstantRoomChat] Send error:", err);
         }
