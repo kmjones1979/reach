@@ -836,27 +836,27 @@ export default function RoomPage({
                 </div>
 
                 {/* Main content area - fills remaining space */}
-                <div className="flex-1 flex min-h-0 overflow-hidden">
+                <div className="flex-1 flex min-h-0 max-h-full overflow-hidden">
                     {/* Video Area - shrinks when chat is open */}
                     <div
-                        className={`p-2 sm:p-3 overflow-hidden transition-all duration-300 ${
+                        className={`p-2 sm:p-3 overflow-hidden transition-all duration-300 min-h-0 ${
                             isChatOpen
                                 ? "flex-1 sm:w-[calc(100%-320px)]"
                                 : "flex-1"
                         }`}
                     >
                         <div
-                            className={`h-full grid gap-2 sm:gap-3 ${getGridClass()}`}
+                            className={`h-full min-h-0 max-h-full grid gap-2 sm:gap-3 ${getGridClass()}`}
                         >
                             {/* Local Video */}
-                            <div className="relative bg-zinc-900 rounded-2xl overflow-hidden">
+                            <div className="relative bg-zinc-900 rounded-2xl overflow-hidden min-h-0">
                                 {!isVideoOff ? (
                                     <video
                                         ref={localVideoRef}
                                         autoPlay
                                         playsInline
                                         muted
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full min-h-0 object-cover"
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
@@ -893,7 +893,7 @@ export default function RoomPage({
                                         initial={{ opacity: 0, scale: 0.9 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.9 }}
-                                        className="relative bg-zinc-900 rounded-2xl overflow-hidden"
+                                        className="relative bg-zinc-900 rounded-2xl overflow-hidden min-h-0"
                                     >
                                         {peer.videoTrack ? (
                                             <video
@@ -922,7 +922,7 @@ export default function RoomPage({
                                                 }}
                                                 autoPlay
                                                 playsInline
-                                                className="w-full h-full object-cover"
+                                                className="w-full h-full min-h-0 object-cover"
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
@@ -1068,7 +1068,7 @@ export default function RoomPage({
 
                             {/* Waiting for others message */}
                             {!hasRemotePeers && (
-                                <div className="flex items-center justify-center bg-zinc-900/50 rounded-2xl border-2 border-dashed border-zinc-700">
+                                <div className="flex items-center justify-center bg-zinc-900/50 rounded-2xl border-2 border-dashed border-zinc-700 min-h-0">
                                     <div className="text-center p-4">
                                         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-800 flex items-center justify-center">
                                             <span className="text-3xl">👥</span>
