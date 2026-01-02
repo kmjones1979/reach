@@ -102,6 +102,7 @@ export default function Home() {
     const [mounted, setMounted] = useState(false);
     const [initializing, setInitializing] = useState(true);
     const [signingIn, setSigningIn] = useState(false);
+    const [authTimeout, setAuthTimeout] = useState(false);
     const hasSavedSession = useRef<boolean | null>(null);
 
     // Handle hydration
@@ -110,6 +111,19 @@ export default function Home() {
         // Check for saved session on mount
         hasSavedSession.current = hasSavedWalletSession();
     }, []);
+
+    // Safety timeout - if stuck loading for too long, show recovery option
+    useEffect(() => {
+        if (mounted && (isSiweLoading || initializing)) {
+            const timeout = setTimeout(() => {
+                console.log("[Auth] Loading timeout reached - showing recovery option");
+                setAuthTimeout(true);
+            }, 15000); // 15 second timeout
+            return () => clearTimeout(timeout);
+        } else {
+            setAuthTimeout(false);
+        }
+    }, [mounted, isSiweLoading, initializing]);
 
     // Give wagmi/appkit time to reconnect from storage
     // Use longer timeout if we detected a saved session (especially for PWA after force quit)
@@ -234,6 +248,28 @@ export default function Home() {
         window.location.reload();
     };
 
+    // Clear auth and start fresh (recovery function)
+    const handleClearAuth = async () => {
+        console.log("[Recovery] Clearing all auth data...");
+        try {
+            // Clear localStorage
+            const keysToRemove = Object.keys(localStorage).filter(k => 
+                k.startsWith("wagmi") || 
+                k.startsWith("@reown") || 
+                k.startsWith("wc@") ||
+                k.includes("walletconnect") ||
+                k === AUTH_CREDENTIALS_KEY ||
+                k === SOLANA_AUTH_CREDENTIALS_KEY
+            );
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+            // Clear IndexedDB
+            indexedDB.deleteDatabase("spritz_auth");
+        } catch (e) {
+            console.error("[Recovery] Error clearing auth:", e);
+        }
+        window.location.reload();
+    };
+
     // Show loading splash while checking auth
     if (isCheckingAuth) {
         // Determine appropriate loading message
@@ -247,19 +283,42 @@ export default function Home() {
         } else if (isPasskeyLoading) {
             loadingMessage = "Checking passkey...";
         }
+
+        // Show error or timeout recovery UI
+        const showRecovery = authTimeout || siweError;
         
         return (
-            <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
-                <div className="flex flex-col items-center justify-center text-center">
-                    <div className="mb-4 animate-pulse">
+            <main className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+                <div className="flex flex-col items-center justify-center text-center max-w-md">
+                    <div className={`mb-4 ${showRecovery ? '' : 'animate-pulse'}`}>
                         <SpritzLogo size="2xl" className="shadow-lg shadow-[#FF5500]/30" />
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-2">
                         Spritz
                     </h1>
-                    <p className="text-zinc-500 text-sm">
-                        {loadingMessage}
+                    <p className="text-zinc-500 text-sm mb-4">
+                        {showRecovery ? (siweError || "Taking longer than expected...") : loadingMessage}
                     </p>
+                    
+                    {showRecovery && (
+                        <div className="space-y-3 w-full">
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="w-full py-3 px-4 rounded-xl bg-[#FF5500] hover:bg-[#FF5500]/90 text-white font-medium transition-colors"
+                            >
+                                Try Again
+                            </button>
+                            <button
+                                onClick={handleClearAuth}
+                                className="w-full py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition-colors"
+                            >
+                                Clear Session & Start Fresh
+                            </button>
+                            <p className="text-zinc-600 text-xs mt-2">
+                                If you&apos;re stuck, try clearing your session. You&apos;ll need to reconnect your wallet.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </main>
         );
