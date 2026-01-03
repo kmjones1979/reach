@@ -121,6 +121,7 @@ export function GoLiveModal({
         }
 
         // Collect tracks from all video element streams (including Broadcast component's video)
+        // Do this multiple times to catch any tracks that might be added asynchronously
         try {
             const videoElements = document.querySelectorAll("video");
             videoElements.forEach((video) => {
@@ -267,25 +268,28 @@ export function GoLiveModal({
         setStatus("ending");
 
         try {
+            // CRITICAL: Set status to "ending" first - this will unmount Broadcast component
+            // The conditional rendering will remove Broadcast.Root from DOM
+            
             // CRITICAL: Force Broadcast component remount by changing key
             broadcastKeyRef.current += 1;
             
-            // CRITICAL: Clear ingestUrl FIRST to unmount Broadcast component
+            // CRITICAL: Clear ingestUrl to ensure Broadcast component is not rendered
             // This must happen before stopping tracks to ensure the component releases them
             setIngestUrl(null);
 
-            // Wait for Broadcast component to unmount and release tracks
-            // iOS needs more time
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            // Wait for Broadcast component to fully unmount from DOM
+            // iOS needs more time for WebRTC to disconnect
+            await new Promise((resolve) => setTimeout(resolve, 500));
 
-            // Now stop all media tracks - the Broadcast component should be unmounted
+            // Now stop all media tracks - the Broadcast component should be completely unmounted
             stopAllMediaTracks();
 
             // Additional cleanup passes with increasing delays for iOS
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await new Promise((resolve) => setTimeout(resolve, 300));
             stopAllMediaTracks();
 
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await new Promise((resolve) => setTimeout(resolve, 500));
             stopAllMediaTracks();
 
             // End the stream in the database
@@ -294,7 +298,7 @@ export function GoLiveModal({
             setStatus("preview");
             setDuration(0);
 
-            // Final cleanup passes for iOS
+            // Final cleanup passes for iOS - more aggressive
             setTimeout(() => {
                 console.log("[GoLive] Final cleanup pass 1 (500ms)");
                 stopAllMediaTracks();
@@ -310,6 +314,11 @@ export function GoLiveModal({
                 stopAllMediaTracks();
             }, 2000);
 
+            setTimeout(() => {
+                console.log("[GoLive] Final cleanup pass 4 (3000ms)");
+                stopAllMediaTracks();
+            }, 3000);
+
             // Don't restart preview camera - user is ending the stream
             // They can reopen the modal if they want to go live again
         } catch (e) {
@@ -318,9 +327,11 @@ export function GoLiveModal({
             // Still try to clean up
             broadcastKeyRef.current += 1;
             setIngestUrl(null);
+            setStatus("ending"); // Force unmount
             stopAllMediaTracks();
             setTimeout(() => stopAllMediaTracks(), 200);
             setTimeout(() => stopAllMediaTracks(), 500);
+            setTimeout(() => stopAllMediaTracks(), 1000);
         }
     };
 
@@ -519,8 +530,8 @@ export function GoLiveModal({
             >
                 {/* Full screen video area */}
                 <div className="flex-1 relative overflow-hidden">
-                    {ingestUrl ? (
-                        /* Live broadcast mode */
+                    {ingestUrl && status !== "ending" ? (
+                        /* Live broadcast mode - only render when not ending */
                         <Broadcast.Root
                             key={broadcastKeyRef.current}
                             ingestUrl={ingestUrl}
