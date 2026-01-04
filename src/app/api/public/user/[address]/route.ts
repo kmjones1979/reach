@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createPublicClient, http, isAddress } from "viem";
+import { normalize } from "viem/ens";
+import { mainnet } from "viem/chains";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+// Create public client for ENS resolution
+const publicClient = createPublicClient({
+    chain: mainnet,
+    transport: http("https://eth.llamarpc.com"),
+});
 
 // GET /api/public/user/[address] - Get public user profile (only if enabled)
 // Supports: wallet address, username, or ENS name
@@ -30,15 +39,33 @@ export async function GET(
             if (usernameData) {
                 normalizedAddress = usernameData.wallet_address.toLowerCase();
             } else {
-                // Try to resolve as ENS name
+                // Try to resolve as ENS name - check database first
+                const normalizedEns = address.toLowerCase().endsWith(".eth") 
+                    ? address.toLowerCase() 
+                    : `${address.toLowerCase()}.eth`;
+                
                 const { data: userData } = await supabase
                     .from("shout_users")
                     .select("wallet_address")
-                    .eq("ens_name", address.toLowerCase())
+                    .or(`ens_name.eq.${address.toLowerCase()},ens_name.eq.${normalizedEns}`)
                     .maybeSingle();
 
                 if (userData) {
                     normalizedAddress = userData.wallet_address.toLowerCase();
+                } else {
+                    // Try on-chain ENS resolution if not in database
+                    try {
+                        const resolvedAddress = await publicClient.getEnsAddress({
+                            name: normalize(normalizedEns),
+                        });
+                        
+                        if (resolvedAddress) {
+                            normalizedAddress = resolvedAddress.toLowerCase();
+                        }
+                    } catch (err) {
+                        // ENS resolution failed, will return 404 below
+                        console.warn("[Public User] ENS resolution failed:", err);
+                    }
                 }
             }
         }
