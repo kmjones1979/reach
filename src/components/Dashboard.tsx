@@ -254,6 +254,7 @@ function DashboardContent({
         toggleDnd,
         toggleSound,
         toggleDecentralizedCalls,
+        togglePublicLanding,
     } = useUserSettings(userAddress);
 
     // Push notifications
@@ -3816,6 +3817,7 @@ function DashboardContent({
                 onToggleSound={toggleSound}
                 onToggleDecentralizedCalls={toggleDecentralizedCalls}
                 isHuddle01Configured={isHuddle01Configured}
+                onTogglePublicLanding={togglePublicLanding}
                 pushSupported={pushSupported}
                 pushPermission={pushPermission}
                 pushSubscribed={pushSubscribed}

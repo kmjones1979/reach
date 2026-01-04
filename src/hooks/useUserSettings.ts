@@ -15,6 +15,7 @@ export type UserSettings = {
     isDnd: boolean;
     soundEnabled: boolean;
     decentralizedCalls: boolean;
+    publicLandingEnabled: boolean;
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -23,6 +24,7 @@ const DEFAULT_SETTINGS: UserSettings = {
     isDnd: false,
     soundEnabled: true,
     decentralizedCalls: false, // Default to Agora until Huddle01 is fully integrated
+    publicLandingEnabled: false, // Default to off for privacy
 };
 
 // Preset status options
@@ -73,6 +75,7 @@ export function useUserSettings(userAddress: string | null) {
                         isDnd: data.is_dnd || false,
                         soundEnabled: data.sound_enabled ?? true,
                         decentralizedCalls: data.decentralized_calls ?? false, // Default to Agora
+                        publicLandingEnabled: data.public_landing_enabled ?? false,
                     });
                 }
             } catch (err) {
@@ -114,6 +117,7 @@ export function useUserSettings(userAddress: string | null) {
                             sound_enabled: updatedSettings.soundEnabled,
                             decentralized_calls:
                                 updatedSettings.decentralizedCalls,
+                            public_landing_enabled: updatedSettings.publicLandingEnabled,
                             updated_at: new Date().toISOString(),
                         },
                         { onConflict: "wallet_address" }
@@ -166,6 +170,14 @@ export function useUserSettings(userAddress: string | null) {
         [updateSettings, settings.decentralizedCalls]
     );
 
+    const togglePublicLanding = useCallback(
+        () =>
+            updateSettings({
+                publicLandingEnabled: !settings.publicLandingEnabled,
+            }),
+        [updateSettings, settings.publicLandingEnabled]
+    );
+
     const clearStatus = useCallback(
         () =>
             updateSettings({
@@ -184,6 +196,7 @@ export function useUserSettings(userAddress: string | null) {
         toggleDnd,
         toggleSound,
         toggleDecentralizedCalls,
+        togglePublicLanding,
         clearStatus,
         isConfigured: isSupabaseConfigured,
     };

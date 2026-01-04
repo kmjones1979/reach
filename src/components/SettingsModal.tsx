@@ -24,6 +24,8 @@ type SettingsModalProps = {
     // Censorship resistance props
     onToggleDecentralizedCalls: () => void;
     isHuddle01Configured: boolean;
+    // Public landing page props
+    onTogglePublicLanding: () => void;
     // Push notification props
     pushSupported: boolean;
     pushPermission: NotificationPermission;
@@ -49,6 +51,7 @@ export function SettingsModal({
     onToggleSound,
     onToggleDecentralizedCalls,
     isHuddle01Configured,
+    onTogglePublicLanding,
     pushSupported,
     pushPermission,
     pushSubscribed,
@@ -389,6 +392,63 @@ export function SettingsModal({
                                             Set NEXT_PUBLIC_HUDDLE01_PROJECT_ID and NEXT_PUBLIC_HUDDLE01_API_KEY to enable
                                         </p>
                                     )}
+
+                                    {/* Public Landing Page Toggle */}
+                                    <button
+                                        onClick={onTogglePublicLanding}
+                                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 transition-colors mt-2"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                                                settings.publicLandingEnabled
+                                                    ? "bg-blue-500/20"
+                                                    : "bg-zinc-700/50"
+                                            }`}>
+                                                <svg
+                                                    className={`w-4 h-4 transition-colors ${
+                                                        settings.publicLandingEnabled
+                                                            ? "text-blue-400"
+                                                            : "text-zinc-500"
+                                                    }`}
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+                                                    />
+                                                </svg>
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="text-white font-medium">
+                                                    Enable Public Landing Page
+                                                </p>
+                                                <p className="text-zinc-500 text-xs">
+                                                    {settings.publicLandingEnabled
+                                                        ? "Your profile is public at /user/[address]"
+                                                        : "Create a public profile page"}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            className={`w-11 h-6 rounded-full transition-colors relative ${
+                                                settings.publicLandingEnabled
+                                                    ? "bg-blue-500"
+                                                    : "bg-zinc-700"
+                                            }`}
+                                        >
+                                            <div
+                                                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                                                    settings.publicLandingEnabled
+                                                        ? "translate-x-5"
+                                                        : "translate-x-0.5"
+                                                }`}
+                                            />
+                                        </div>
+                                    </button>
                                 </div>
 
                                 {/* Sound & Notifications Section */}
