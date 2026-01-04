@@ -865,6 +865,167 @@ export default function RoomPage({
         }
     };
 
+    // Aggressive media track cleanup (similar to Go Live)
+    const stopAllMediaTracks = useCallback(() => {
+        const allTracks: MediaStreamTrack[] = [];
+        const trackIds = new Set<string>();
+
+        // Collect tracks from local video element
+        if (localVideoRef.current) {
+            const stream = localVideoRef.current.srcObject as MediaStream;
+            if (stream) {
+                stream.getTracks().forEach((track) => {
+                    if (!trackIds.has(track.id)) {
+                        allTracks.push(track);
+                        trackIds.add(track.id);
+                    }
+                });
+                localVideoRef.current.srcObject = null;
+            }
+        }
+
+        // Collect tracks from local screen share
+        if (localScreenShareRef.current) {
+            const stream = localScreenShareRef.current.srcObject as MediaStream;
+            if (stream) {
+                stream.getTracks().forEach((track) => {
+                    if (!trackIds.has(track.id)) {
+                        allTracks.push(track);
+                        trackIds.add(track.id);
+                    }
+                });
+                localScreenShareRef.current.srcObject = null;
+            }
+        }
+
+        // Collect tracks from all remote video elements
+        remoteVideoRefs.current.forEach((video) => {
+            const stream = video.srcObject as MediaStream;
+            if (stream) {
+                stream.getTracks().forEach((track) => {
+                    if (!trackIds.has(track.id)) {
+                        allTracks.push(track);
+                        trackIds.add(track.id);
+                    }
+                });
+                video.srcObject = null;
+            }
+        });
+
+        // Collect tracks from all remote screen share elements
+        remoteScreenShareRefs.current.forEach((video) => {
+            const stream = video.srcObject as MediaStream;
+            if (stream) {
+                stream.getTracks().forEach((track) => {
+                    if (!trackIds.has(track.id)) {
+                        allTracks.push(track);
+                        trackIds.add(track.id);
+                    }
+                });
+                video.srcObject = null;
+            }
+        });
+
+        // Collect tracks from all audio elements
+        remoteAudioRefs.current.forEach((audio) => {
+            const stream = audio.srcObject as MediaStream;
+            if (stream) {
+                stream.getTracks().forEach((track) => {
+                    if (!trackIds.has(track.id)) {
+                        allTracks.push(track);
+                        trackIds.add(track.id);
+                    }
+                });
+                audio.srcObject = null;
+            }
+        });
+
+        // AGGRESSIVE: Collect from all video/audio elements in DOM
+        try {
+            const videoElements = document.querySelectorAll("video");
+            videoElements.forEach((video) => {
+                const stream = video.srcObject as MediaStream;
+                if (stream) {
+                    stream.getTracks().forEach((track) => {
+                        if (!trackIds.has(track.id)) {
+                            allTracks.push(track);
+                            trackIds.add(track.id);
+                        }
+                    });
+                    video.srcObject = null;
+                }
+            });
+        } catch (e) {
+            console.error("[Room] Error collecting video streams:", e);
+        }
+
+        try {
+            const audioElements = document.querySelectorAll("audio");
+            audioElements.forEach((audio) => {
+                const stream = audio.srcObject as MediaStream;
+                if (stream) {
+                    stream.getTracks().forEach((track) => {
+                        if (!trackIds.has(track.id)) {
+                            allTracks.push(track);
+                            trackIds.add(track.id);
+                        }
+                    });
+                    audio.srcObject = null;
+                }
+            });
+        } catch (e) {
+            console.error("[Room] Error collecting audio streams:", e);
+        }
+
+        // Stop ALL tracks immediately with iOS-specific handling
+        // Stop audio tracks FIRST (they're often the ones that stick around)
+        const audioTracks = allTracks.filter((t) => t.kind === "audio");
+        const videoTracks = allTracks.filter((t) => t.kind === "video");
+
+        // Stop audio tracks first
+        audioTracks.forEach((track) => {
+            try {
+                if (track.readyState !== "ended") {
+                    track.enabled = false;
+                    track.stop();
+                    if (typeof (track as any).close === "function") {
+                        (track as any).close();
+                    }
+                    console.log("[Room] Stopped AUDIO track:", track.id, track.label);
+                }
+            } catch (e) {
+                console.error("[Room] Error stopping audio track:", e);
+            }
+        });
+
+        // Then stop video tracks
+        videoTracks.forEach((track) => {
+            try {
+                if (track.readyState !== "ended") {
+                    track.enabled = false;
+                    track.stop();
+                    if (typeof (track as any).close === "function") {
+                        (track as any).close();
+                    }
+                    console.log("[Room] Stopped VIDEO track:", track.id, track.label);
+                }
+            } catch (e) {
+                console.error("[Room] Error stopping video track:", e);
+            }
+        });
+
+        // Force garbage collection hint (iOS Safari sometimes needs this)
+        if (typeof window !== "undefined") {
+            requestAnimationFrame(() => {
+                document.body.style.display = "none";
+                document.body.offsetHeight; // Trigger reflow
+                document.body.style.display = "";
+            });
+        }
+
+        console.log(`[Room] Stopped ${allTracks.length} media tracks`);
+    }, []);
+
     const handleLeave = useCallback(async () => {
         if (durationIntervalRef.current) {
             clearInterval(durationIntervalRef.current);
@@ -884,22 +1045,6 @@ export default function RoomPage({
             }
         }
 
-        // Clean up screen share refs
-        if (localScreenShareRef.current) {
-            const stream = localScreenShareRef.current.srcObject as MediaStream;
-            if (stream) {
-                stream.getTracks().forEach((t) => t.stop());
-            }
-            localScreenShareRef.current.srcObject = null;
-        }
-        remoteScreenShareRefs.current.forEach((el) => {
-            if (el.srcObject) {
-                const stream = el.srcObject as MediaStream;
-                stream.getTracks().forEach((t) => t.stop());
-                el.srcObject = null;
-            }
-        });
-
         if (clientRef.current) {
             try {
                 await clientRef.current.leaveRoom();
@@ -909,10 +1054,39 @@ export default function RoomPage({
             clientRef.current = null;
         }
 
+        // IMMEDIATE cleanup - don't wait for anything
+        stopAllMediaTracks();
+
+        // Additional aggressive cleanup passes with delays for iOS (non-blocking)
+        setTimeout(() => {
+            console.log("[Room] Cleanup pass 1 (200ms)");
+            stopAllMediaTracks();
+        }, 200);
+
+        setTimeout(() => {
+            console.log("[Room] Cleanup pass 2 (400ms)");
+            stopAllMediaTracks();
+        }, 400);
+
+        setTimeout(() => {
+            console.log("[Room] Cleanup pass 3 (600ms)");
+            stopAllMediaTracks();
+        }, 600);
+
+        setTimeout(() => {
+            console.log("[Room] Cleanup pass 4 (1000ms)");
+            stopAllMediaTracks();
+        }, 1000);
+
+        setTimeout(() => {
+            console.log("[Room] Cleanup pass 5 (2000ms)");
+            stopAllMediaTracks();
+        }, 2000);
+
         setInCall(false);
         setCallDuration(0);
         setIsScreenSharing(false);
-    }, [isScreenSharing]);
+    }, [isScreenSharing, stopAllMediaTracks]);
 
     const toggleMute = useCallback(async () => {
         if (!clientRef.current) return;
@@ -1643,8 +1817,10 @@ export default function RoomPage({
             if (clientRef.current) {
                 clientRef.current.leaveRoom().catch(() => {});
             }
+            // Cleanup media tracks on unmount
+            stopAllMediaTracks();
         };
-    }, []);
+    }, [stopAllMediaTracks]);
 
     if (loading) {
         return (
@@ -2804,11 +2980,35 @@ export default function RoomPage({
             >
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <Link href="/" className="inline-block mb-6">
-                        <span className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
-                            Spritz
-                        </span>
-                    </Link>
+                    <div className="flex items-center justify-between mb-6">
+                        {isPWA && (
+                            <Link
+                                href="/"
+                                className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                                title="Back to Dashboard"
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M15 19l-7-7 7-7"
+                                    />
+                                </svg>
+                            </Link>
+                        )}
+                        <Link href="/" className={`inline-block ${isPWA ? "flex-1 text-center" : ""}`}>
+                            <span className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
+                                Spritz
+                            </span>
+                        </Link>
+                        {isPWA && <div className="w-[42px]" />}
+                    </div>
                 </div>
 
                 {/* Room Card */}

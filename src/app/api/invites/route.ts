@@ -28,11 +28,16 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Generate codes if needed
-        await supabase.rpc("generate_user_invite_codes", {
-            p_address: walletAddress.toLowerCase(),
-            p_count: 5,
-        });
+        // Generate codes if needed (ignore errors - codes might already exist)
+        try {
+            await supabase.rpc("generate_user_invite_codes", {
+                p_address: walletAddress.toLowerCase(),
+                p_count: 5,
+            });
+        } catch (rpcError) {
+            // Log but don't fail - codes might already exist
+            console.warn("[Invites] RPC error (non-fatal):", rpcError);
+        }
 
         // Get user's invite codes
         const { data: invites, error: invitesError } = await supabase
@@ -42,7 +47,7 @@ export async function GET(request: NextRequest) {
             .order("created_at", { ascending: true });
 
         if (invitesError) {
-            console.error("[Invites] Error:", invitesError);
+            console.error("[Invites] Error fetching invites:", invitesError);
             return NextResponse.json(
                 { error: "Failed to get invites" },
                 { status: 500 }

@@ -41,16 +41,25 @@ export function useUserInvites(walletAddress: string | null) {
             const response = await fetch(
                 `/api/invites?address=${walletAddress}`
             );
-            const data = await response.json();
 
             if (!response.ok) {
+                let errorMessage = "Failed to load invites";
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch {
+                    // If response is not JSON, use status text
+                    errorMessage = response.statusText || errorMessage;
+                }
                 setState((prev) => ({
                     ...prev,
                     isLoading: false,
-                    error: data.error || "Failed to load invites",
+                    error: errorMessage,
                 }));
                 return;
             }
+
+            const data = await response.json();
 
             setState({
                 invites: data.invites || [],
@@ -62,10 +71,13 @@ export function useUserInvites(walletAddress: string | null) {
             });
         } catch (err) {
             console.error("[Invites] Load error:", err);
+            const errorMessage = err instanceof Error 
+                ? err.message 
+                : "Failed to load invites. Please check your connection.";
             setState((prev) => ({
                 ...prev,
                 isLoading: false,
-                error: "Failed to load invites",
+                error: errorMessage,
             }));
         }
     }, [walletAddress]);

@@ -366,6 +366,12 @@ export default function AdminPage() {
                             >
                                 Analytics
                             </Link>
+                            <Link
+                                href="/admin/bug-reports"
+                                className="text-zinc-400 hover:text-white transition-colors"
+                            >
+                                Bug Reports
+                            </Link>
                             <span className="text-zinc-500 text-sm">
                                 {formatAddress(address || "")}
                             </span>
@@ -418,6 +424,12 @@ export default function AdminPage() {
                                     className="px-3 py-1.5 bg-[#FF5500] text-white rounded-lg font-medium"
                                 >
                                     👥
+                                </Link>
+                                <Link
+                                    href="/admin/bug-reports"
+                                    className="px-3 py-1.5 bg-zinc-800 text-white rounded-lg font-medium"
+                                >
+                                    🐛
                                 </Link>
                             </div>
                         </div>

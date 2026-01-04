@@ -35,6 +35,7 @@ import { isAgoraConfigured } from "@/config/agora";
 import { isHuddle01Configured, createHuddle01Room } from "@/config/huddle01";
 import { StatusModal } from "./StatusModal";
 import { SettingsModal } from "./SettingsModal";
+import { BugReportModal } from "./BugReportModal";
 import { QRCodeModal } from "./QRCodeModal";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { SocialsModal } from "./SocialsModal";
@@ -431,6 +432,7 @@ function DashboardContent({
 
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
 
     // Cache for user info fetched from API
     const [userInfoCache, setUserInfoCache] = useState<Map<string, { name: string | null; avatar: string | null }>>(new Map());
@@ -1780,7 +1782,7 @@ function DashboardContent({
                                                 style={{
                                                     // Ensure menu doesn't get cut off on small screens
                                                     // Use dvh for iOS Safari dynamic viewport height
-                                                    maxHeight: 'min(calc(100dvh - 140px), 520px)',
+                                                    maxHeight: 'min(calc(100dvh - 140px), 700px)',
                                                 }}
                                             >
                                                 {/* 1. My QR Code */}
@@ -2298,13 +2300,13 @@ function DashboardContent({
                                                     );
                                                 })()}
 
-                                                {/* 8. Settings */}
+                                                {/* 8. Bug Report */}
                                                 <button
                                                     onClick={() => {
                                                         setIsProfileMenuOpen(
                                                             false
                                                         );
-                                                        setIsSettingsModalOpen(
+                                                        setIsBugReportModalOpen(
                                                             true
                                                         );
                                                     }}
@@ -2321,22 +2323,16 @@ function DashboardContent({
                                                                 strokeLinecap="round"
                                                                 strokeLinejoin="round"
                                                                 strokeWidth={2}
-                                                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                                                            />
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                                                             />
                                                         </svg>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-white text-sm font-medium">
-                                                            Settings
+                                                            Submit Bug Report
                                                         </p>
                                                         <p className="text-zinc-500 text-xs">
-                                                            Sound & preferences
+                                                            Help us improve Spritz
                                                         </p>
                                                     </div>
                                                 </button>
@@ -4241,6 +4237,13 @@ function DashboardContent({
                 onCreateStream={createStream}
                 onGoLive={goLive}
                 onEndStream={endStream}
+            />
+
+            {/* Bug Report Modal */}
+            <BugReportModal
+                isOpen={isBugReportModalOpen}
+                onClose={() => setIsBugReportModalOpen(false)}
+                userAddress={userAddress}
             />
 
             {/* Live Stream Player removed - now using /live/[id] page */}
