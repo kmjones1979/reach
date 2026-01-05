@@ -456,7 +456,11 @@ export function SettingsModal({
                                     {settings.publicLandingEnabled && userAddress && (
                                         <div className="mt-3 px-4">
                                             <button
-                                                onClick={async () => {
+                                                type="button"
+                                                onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    
                                                     if (!userAddress) {
                                                         console.error("[Settings] No user address available");
                                                         return;
@@ -497,35 +501,15 @@ export function SettingsModal({
                                                         profilePath = userAddress.toLowerCase();
                                                     }
                                                     
-                                                    // Construct URL - ensure it's always valid
-                                                    const baseUrl = window.location.origin || 'https://app.spritz.chat';
-                                                    const profileUrl = `${baseUrl}/user/${profilePath}`;
+                                                    // Construct URL - use exact same method as working scheduling link
+                                                    const profileUrl = `${window.location.origin}/user/${profilePath}`;
                                                     
                                                     console.log("[Settings] Copying profile URL:", profileUrl);
                                                     
-                                                    try {
-                                                        await navigator.clipboard.writeText(profileUrl);
-                                                        setCopiedLink(true);
-                                                        setTimeout(() => setCopiedLink(false), 2000);
-                                                    } catch (clipboardErr) {
-                                                        console.error("[Settings] Clipboard error:", clipboardErr);
-                                                        // Fallback: try to select and copy
-                                                        const textArea = document.createElement("textarea");
-                                                        textArea.value = profileUrl;
-                                                        textArea.style.position = "fixed";
-                                                        textArea.style.opacity = "0";
-                                                        document.body.appendChild(textArea);
-                                                        textArea.select();
-                                                        try {
-                                                            document.execCommand("copy");
-                                                            setCopiedLink(true);
-                                                            setTimeout(() => setCopiedLink(false), 2000);
-                                                        } catch (fallbackErr) {
-                                                            console.error("[Settings] Fallback copy failed:", fallbackErr);
-                                                            alert(`Profile URL: ${profileUrl}`);
-                                                        }
-                                                        document.body.removeChild(textArea);
-                                                    }
+                                                    // Use exact same method as working scheduling link
+                                                    navigator.clipboard.writeText(profileUrl);
+                                                    setCopiedLink(true);
+                                                    setTimeout(() => setCopiedLink(false), 2000);
                                                 }}
                                                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400"
                                             >
