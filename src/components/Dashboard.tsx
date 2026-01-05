@@ -3434,18 +3434,48 @@ function DashboardContent({
                                                     // Continue anyway - room might already exist
                                                 }
                                                 
-                                                // Use exact same method as working scheduling link
-                                                const link = `${window.location.origin}/room/${userAddress}`;
-                                                navigator.clipboard.writeText(link);
+                                                // Construct URL - ensure it's always valid
+                                                const baseUrl = window.location.origin || 'https://app.spritz.chat';
+                                                const link = `${baseUrl}/room/${userAddress.toLowerCase()}`;
                                                 
-                                                // Show feedback
-                                                const btn = document.activeElement as HTMLElement;
-                                                const original = btn?.textContent;
-                                                if (btn) {
-                                                    btn.textContent = "Copied!";
-                                                    setTimeout(() => {
-                                                        if (btn) btn.textContent = original || "Copy Link";
-                                                    }, 2000);
+                                                console.log("[Dashboard] Copying room link:", link);
+                                                
+                                                try {
+                                                    await navigator.clipboard.writeText(link);
+                                                    
+                                                    // Show feedback
+                                                    const btn = document.activeElement as HTMLElement;
+                                                    const original = btn?.textContent;
+                                                    if (btn) {
+                                                        btn.textContent = "Copied!";
+                                                        setTimeout(() => {
+                                                            if (btn) btn.textContent = original || "Copy Link";
+                                                        }, 2000);
+                                                    }
+                                                } catch (clipboardErr) {
+                                                    console.error("[Dashboard] Clipboard error:", clipboardErr);
+                                                    // Fallback: try to select and copy
+                                                    const textArea = document.createElement("textarea");
+                                                    textArea.value = link;
+                                                    textArea.style.position = "fixed";
+                                                    textArea.style.opacity = "0";
+                                                    document.body.appendChild(textArea);
+                                                    textArea.select();
+                                                    try {
+                                                        document.execCommand("copy");
+                                                        const btn = document.activeElement as HTMLElement;
+                                                        const original = btn?.textContent;
+                                                        if (btn) {
+                                                            btn.textContent = "Copied!";
+                                                            setTimeout(() => {
+                                                                if (btn) btn.textContent = original || "Copy Link";
+                                                            }, 2000);
+                                                        }
+                                                    } catch (fallbackErr) {
+                                                        console.error("[Dashboard] Fallback copy failed:", fallbackErr);
+                                                        alert(`Room URL: ${link}`);
+                                                    }
+                                                    document.body.removeChild(textArea);
                                                 }
                                             }}
                                             className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap"

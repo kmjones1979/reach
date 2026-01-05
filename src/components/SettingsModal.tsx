@@ -462,31 +462,29 @@ export function SettingsModal({
                                                         return;
                                                     }
                                                     
-                                                    // Try to get username or ENS for prettier URL
+                                                    // Always start with wallet address as fallback
                                                     let profilePath = userAddress.toLowerCase();
                                                     
-                                                    // Fetch username (non-blocking)
+                                                    // Try to get username or ENS for prettier URL (non-blocking)
                                                     if (supabase) {
                                                         try {
-                                                            const { data: usernameData } = await supabase
-                                                                .from("shout_usernames")
-                                                                .select("username")
-                                                                .eq("wallet_address", userAddress.toLowerCase())
-                                                                .maybeSingle();
-                                                            
-                                                            if (usernameData?.username) {
-                                                                profilePath = usernameData.username;
-                                                            } else {
-                                                                // Try ENS
-                                                                const { data: userData } = await supabase
+                                                            const [usernameResult, userResult] = await Promise.allSettled([
+                                                                supabase
+                                                                    .from("shout_usernames")
+                                                                    .select("username")
+                                                                    .eq("wallet_address", userAddress.toLowerCase())
+                                                                    .maybeSingle(),
+                                                                supabase
                                                                     .from("shout_users")
                                                                     .select("ens_name")
                                                                     .eq("wallet_address", userAddress.toLowerCase())
-                                                                    .maybeSingle();
-                                                                
-                                                                if (userData?.ens_name) {
-                                                                    profilePath = userData.ens_name;
-                                                                }
+                                                                    .maybeSingle()
+                                                            ]);
+                                                            
+                                                            if (usernameResult.status === "fulfilled" && usernameResult.value.data?.username) {
+                                                                profilePath = usernameResult.value.data.username;
+                                                            } else if (userResult.status === "fulfilled" && userResult.value.data?.ens_name) {
+                                                                profilePath = userResult.value.data.ens_name;
                                                             }
                                                         } catch (dbErr) {
                                                             console.error("[Settings] DB error:", dbErr);
@@ -494,11 +492,40 @@ export function SettingsModal({
                                                         }
                                                     }
                                                     
-                                                    // Use exact same method as working scheduling link
-                                                    const profileUrl = `${window.location.origin}/user/${profilePath}`;
-                                                    navigator.clipboard.writeText(profileUrl);
-                                                    setCopiedLink(true);
-                                                    setTimeout(() => setCopiedLink(false), 2000);
+                                                    // Ensure profilePath is never empty
+                                                    if (!profilePath || profilePath.trim() === "") {
+                                                        profilePath = userAddress.toLowerCase();
+                                                    }
+                                                    
+                                                    // Construct URL - ensure it's always valid
+                                                    const baseUrl = window.location.origin || 'https://app.spritz.chat';
+                                                    const profileUrl = `${baseUrl}/user/${profilePath}`;
+                                                    
+                                                    console.log("[Settings] Copying profile URL:", profileUrl);
+                                                    
+                                                    try {
+                                                        await navigator.clipboard.writeText(profileUrl);
+                                                        setCopiedLink(true);
+                                                        setTimeout(() => setCopiedLink(false), 2000);
+                                                    } catch (clipboardErr) {
+                                                        console.error("[Settings] Clipboard error:", clipboardErr);
+                                                        // Fallback: try to select and copy
+                                                        const textArea = document.createElement("textarea");
+                                                        textArea.value = profileUrl;
+                                                        textArea.style.position = "fixed";
+                                                        textArea.style.opacity = "0";
+                                                        document.body.appendChild(textArea);
+                                                        textArea.select();
+                                                        try {
+                                                            document.execCommand("copy");
+                                                            setCopiedLink(true);
+                                                            setTimeout(() => setCopiedLink(false), 2000);
+                                                        } catch (fallbackErr) {
+                                                            console.error("[Settings] Fallback copy failed:", fallbackErr);
+                                                            alert(`Profile URL: ${profileUrl}`);
+                                                        }
+                                                        document.body.removeChild(textArea);
+                                                    }
                                                 }}
                                                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400"
                                             >
