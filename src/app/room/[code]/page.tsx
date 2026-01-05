@@ -727,6 +727,28 @@ export default function RoomPage({
                                 label?.includes("screen")
                             ) {
                                 peer.screenShareTrack = track;
+                                
+                                // IMPORTANT: Ensure audio track remains active when screen sharing starts
+                                // Re-attach audio if it exists to prevent it from being stopped
+                                if (peer.audioTrack) {
+                                    const audioEl = remoteAudioRefs.current.get(peerId);
+                                    if (audioEl && peer.audioTrack) {
+                                        // Re-attach audio track to ensure it keeps playing
+                                        const audioStream = new MediaStream([peer.audioTrack]);
+                                        audioEl.srcObject = audioStream;
+                                        audioEl.play().catch((e) =>
+                                            console.warn(
+                                                "[Room] Audio re-attach failed during screen share:",
+                                                e
+                                            )
+                                        );
+                                        console.log(
+                                            "[Room] Re-attached audio track for screen sharing peer:",
+                                            peerId
+                                        );
+                                    }
+                                }
+                                
                                 // Try to play screen share immediately and also with a small delay
                                 const playScreenShare = () => {
                                     const screenEl =
@@ -2206,34 +2228,32 @@ export default function RoomPage({
 
                                 {/* Small video feeds row at bottom */}
                                 <div className="flex-shrink-0 h-24 sm:h-32 flex gap-2 sm:gap-3 overflow-x-auto">
-                                    {/* Local video (if not screen sharing) */}
-                                    {!isScreenSharing && (
-                                        <div className="flex-shrink-0 w-32 sm:w-40 relative bg-zinc-900 rounded-xl overflow-hidden">
-                                            {!isVideoOff ? (
-                                                <video
-                                                    ref={localVideoRef}
-                                                    autoPlay
-                                                    playsInline
-                                                    muted
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
-                                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
-                                                        <span className="text-lg text-white font-bold">
-                                                            {displayName[0]?.toUpperCase() ||
-                                                                "?"}
-                                                        </span>
-                                                    </div>
+                                    {/* Local video - always show when video is enabled */}
+                                    <div className="flex-shrink-0 w-32 sm:w-40 relative bg-zinc-900 rounded-xl overflow-hidden">
+                                        {!isVideoOff ? (
+                                            <video
+                                                ref={localVideoRef}
+                                                autoPlay
+                                                playsInline
+                                                muted
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+                                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
+                                                    <span className="text-lg text-white font-bold">
+                                                        {displayName[0]?.toUpperCase() ||
+                                                            "?"}
+                                                    </span>
                                                 </div>
-                                            )}
-                                            <div className="absolute bottom-1 left-1">
-                                                <span className="px-1.5 py-0.5 bg-black/60 rounded text-white text-[10px]">
-                                                    {displayName} (You)
-                                                </span>
                                             </div>
+                                        )}
+                                        <div className="absolute bottom-1 left-1">
+                                            <span className="px-1.5 py-0.5 bg-black/60 rounded text-white text-[10px]">
+                                                {displayName} (You)
+                                            </span>
                                         </div>
-                                    )}
+                                    </div>
 
                                     {/* Remote peers (excluding the one sharing screen) */}
                                     {remotePeerArray
@@ -2290,7 +2310,7 @@ export default function RoomPage({
                                                         {peer.displayName}
                                                     </span>
                                                 </div>
-                                                {/* Remote Audio Element (hidden) */}
+                                                {/* Remote Audio Element (hidden) - Always update when track is available */}
                                                 <audio
                                                     ref={(el) => {
                                                         if (el) {
@@ -2313,19 +2333,23 @@ export default function RoomPage({
                                                                         () => {}
                                                                     );
                                                             }
-                                                            if (
-                                                                peer.audioTrack &&
-                                                                !el.srcObject
-                                                            ) {
-                                                                el.srcObject =
-                                                                    new MediaStream(
-                                                                        [
-                                                                            peer.audioTrack,
-                                                                        ]
+                                                            // Always update audio track when available (even if srcObject exists)
+                                                            if (peer.audioTrack) {
+                                                                const currentStream = el.srcObject as MediaStream;
+                                                                const currentTrack = currentStream?.getAudioTracks()[0];
+                                                                
+                                                                // Only update if track changed
+                                                                if (!currentTrack || currentTrack.id !== peer.audioTrack.id) {
+                                                                    el.srcObject =
+                                                                        new MediaStream(
+                                                                            [
+                                                                                peer.audioTrack,
+                                                                            ]
+                                                                        );
+                                                                    el.play().catch(
+                                                                        () => {}
                                                                     );
-                                                                el.play().catch(
-                                                                    () => {}
-                                                                );
+                                                                }
                                                             }
                                                         }
                                                     }}
