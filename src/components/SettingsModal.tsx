@@ -457,57 +457,10 @@ export function SettingsModal({
                                         <div className="mt-3 px-4">
                                             <button
                                                 type="button"
-                                                onClick={async (e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    
-                                                    if (!userAddress) {
-                                                        console.error("[Settings] No user address available");
-                                                        return;
-                                                    }
-                                                    
-                                                    // Always start with wallet address as fallback
-                                                    let profilePath = userAddress.toLowerCase();
-                                                    
-                                                    // Try to get username or ENS for prettier URL (non-blocking)
-                                                    if (supabase) {
-                                                        try {
-                                                            const [usernameResult, userResult] = await Promise.allSettled([
-                                                                supabase
-                                                                    .from("shout_usernames")
-                                                                    .select("username")
-                                                                    .eq("wallet_address", userAddress.toLowerCase())
-                                                                    .maybeSingle(),
-                                                                supabase
-                                                                    .from("shout_users")
-                                                                    .select("ens_name")
-                                                                    .eq("wallet_address", userAddress.toLowerCase())
-                                                                    .maybeSingle()
-                                                            ]);
-                                                            
-                                                            if (usernameResult.status === "fulfilled" && usernameResult.value.data?.username) {
-                                                                profilePath = usernameResult.value.data.username;
-                                                            } else if (userResult.status === "fulfilled" && userResult.value.data?.ens_name) {
-                                                                profilePath = userResult.value.data.ens_name;
-                                                            }
-                                                        } catch (dbErr) {
-                                                            console.error("[Settings] DB error:", dbErr);
-                                                            // Continue with wallet address as fallback
-                                                        }
-                                                    }
-                                                    
-                                                    // Ensure profilePath is never empty
-                                                    if (!profilePath || profilePath.trim() === "") {
-                                                        profilePath = userAddress.toLowerCase();
-                                                    }
-                                                    
-                                                    // Construct URL - use exact same method as working scheduling link
-                                                    const profileUrl = `${window.location.origin}/user/${profilePath}`;
-                                                    
-                                                    console.log("[Settings] Copying profile URL:", profileUrl);
-                                                    
-                                                    // Use exact same method as working scheduling link
-                                                    navigator.clipboard.writeText(profileUrl);
+                                                onClick={() => {
+                                                    if (!userAddress) return;
+                                                    const link = `${window.location.origin}/user/${userAddress.toLowerCase()}`;
+                                                    navigator.clipboard.writeText(link);
                                                     setCopiedLink(true);
                                                     setTimeout(() => setCopiedLink(false), 2000);
                                                 }}

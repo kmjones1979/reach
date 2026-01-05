@@ -3420,39 +3420,20 @@ function DashboardContent({
                                     <div className="flex items-center gap-2">
                                         <button
                                             type="button"
-                                            onClick={async (e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                
-                                                if (!userAddress) {
-                                                    console.error("[Dashboard] No user address for room link");
-                                                    return;
-                                                }
-                                                
-                                                // Ensure permanent room exists first (non-blocking)
-                                                try {
-                                                    await fetch(`/api/rooms/permanent?wallet_address=${userAddress}`);
-                                                } catch (err) {
-                                                    console.error("Failed to ensure room exists:", err);
-                                                    // Continue anyway - room might already exist
-                                                }
-                                                
-                                                // Use exact same method as working scheduling link
+                                            onClick={() => {
+                                                if (!userAddress) return;
                                                 const link = `${window.location.origin}/room/${userAddress.toLowerCase()}`;
-                                                
-                                                console.log("[Dashboard] Copying room link:", link);
-                                                
-                                                // Use exact same method as working scheduling link - synchronous
                                                 navigator.clipboard.writeText(link);
-                                                
-                                                // Show feedback using event target
-                                                const btn = e.currentTarget;
-                                                const original = btn.textContent;
-                                                btn.textContent = "Copied!";
-                                                setTimeout(() => {
-                                                    btn.textContent = original || "Copy Link";
-                                                }, 2000);
+                                                const btn = document.querySelector('[data-room-copy-btn]') as HTMLElement;
+                                                if (btn) {
+                                                    const original = btn.textContent;
+                                                    btn.textContent = "Copied!";
+                                                    setTimeout(() => {
+                                                        btn.textContent = original || "Copy Link";
+                                                    }, 2000);
+                                                }
                                             }}
+                                            data-room-copy-btn
                                             className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap"
                                         >
                                             Copy Link
