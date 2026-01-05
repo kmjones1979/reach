@@ -141,6 +141,7 @@ const nextConfig = {
     },
 };
 
+// @ts-expect-error - next-pwa type compatibility issue with Next.js config
 export default withPWA(nextConfig);
 
 
