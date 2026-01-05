@@ -24,7 +24,7 @@ type Category = typeof CATEGORIES[number];
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { userAddress, category, description, replicationSteps } = body;
+        const { userAddress, category, description, replicationSteps, mediaUrls } = body;
 
         if (!userAddress) {
             return NextResponse.json(
@@ -47,6 +47,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Validate mediaUrls if provided
+        let mediaUrlsArray: string[] = [];
+        if (mediaUrls && Array.isArray(mediaUrls)) {
+            mediaUrlsArray = mediaUrls.filter((url: any) => typeof url === "string");
+        }
+
         const { data, error: insertError } = await supabase
             .from("shout_bug_reports")
             .insert({
@@ -54,6 +60,7 @@ export async function POST(request: NextRequest) {
                 category: category as Category,
                 description: description.trim(),
                 replication_steps: replicationSteps?.trim() || null,
+                media_urls: mediaUrlsArray.length > 0 ? mediaUrlsArray : [],
                 status: "open",
             })
             .select()

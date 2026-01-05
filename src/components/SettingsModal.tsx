@@ -457,38 +457,43 @@ export function SettingsModal({
                                         <div className="mt-3 px-4">
                                             <button
                                                 onClick={async () => {
-                                                    // Try to get username or ENS for prettier URL
-                                                    let profilePath = userAddress.toLowerCase();
-                                                    
-                                                    // Fetch username
-                                                    if (supabase) {
-                                                        const { data: usernameData } = await supabase
-                                                            .from("shout_usernames")
-                                                            .select("username")
-                                                            .eq("wallet_address", userAddress.toLowerCase())
-                                                            .maybeSingle();
+                                                    try {
+                                                        // Try to get username or ENS for prettier URL
+                                                        let profilePath = userAddress.toLowerCase();
                                                         
-                                                        if (usernameData?.username) {
-                                                            profilePath = usernameData.username;
-                                                        } else {
-                                                            // Try ENS
-                                                            const { data: userData } = await supabase
-                                                                .from("shout_users")
-                                                                .select("ens_name")
+                                                        // Fetch username
+                                                        if (supabase) {
+                                                            const { data: usernameData } = await supabase
+                                                                .from("shout_usernames")
+                                                                .select("username")
                                                                 .eq("wallet_address", userAddress.toLowerCase())
                                                                 .maybeSingle();
                                                             
-                                                            if (userData?.ens_name) {
-                                                                profilePath = userData.ens_name;
+                                                            if (usernameData?.username) {
+                                                                profilePath = usernameData.username;
+                                                            } else {
+                                                                // Try ENS
+                                                                const { data: userData } = await supabase
+                                                                    .from("shout_users")
+                                                                    .select("ens_name")
+                                                                    .eq("wallet_address", userAddress.toLowerCase())
+                                                                    .maybeSingle();
+                                                                
+                                                                if (userData?.ens_name) {
+                                                                    profilePath = userData.ens_name;
+                                                                }
                                                             }
                                                         }
+                                                        
+                                                        // Ensure we're using /user/ path, not /room/
+                                                        const profileUrl = `${window.location.origin}/user/${profilePath}`;
+                                                        console.log("[Settings] Copying profile URL:", profileUrl);
+                                                        navigator.clipboard.writeText(profileUrl);
+                                                        setCopiedLink(true);
+                                                        setTimeout(() => setCopiedLink(false), 2000);
+                                                    } catch (err) {
+                                                        console.error("[Settings] Failed to copy profile link:", err);
                                                     }
-                                                    
-                                                    // Use exact same method as working scheduling link
-                                                    const profileUrl = `${window.location.origin}/user/${profilePath}`;
-                                                    navigator.clipboard.writeText(profileUrl);
-                                                    setCopiedLink(true);
-                                                    setTimeout(() => setCopiedLink(false), 2000);
                                                 }}
                                                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400"
                                             >

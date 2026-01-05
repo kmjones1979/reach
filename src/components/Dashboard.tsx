@@ -3429,6 +3429,7 @@ function DashboardContent({
                                                 
                                                 // Copy link using same method as working scheduling link
                                                 const link = `${window.location.origin}/room/${userAddress}`;
+                                                console.log("[Dashboard] Copying room link:", link);
                                                 navigator.clipboard.writeText(link);
                                                 
                                                 // Show feedback
@@ -3451,7 +3452,9 @@ function DashboardContent({
                                                     // Ensure permanent room exists
                                                     const res = await fetch(`/api/rooms/permanent?wallet_address=${userAddress}`);
                                                     if (res.ok) {
-                                                        window.open(`https://app.spritz.chat/room/${userAddress}`, "_blank");
+                                                        // Use window.location.origin instead of hardcoded URL
+                                                        const roomUrl = `${window.location.origin}/room/${userAddress}`;
+                                                        window.location.href = roomUrl; // Use same-page navigation instead of new tab
                                                     } else {
                                                         alert("Failed to open room");
                                                     }

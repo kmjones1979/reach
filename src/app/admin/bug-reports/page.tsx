@@ -11,6 +11,7 @@ type BugReport = {
     category: string;
     description: string;
     replication_steps: string | null;
+    media_urls: string[] | null;
     status: "open" | "in_progress" | "resolved" | "closed";
     admin_notes: string | null;
     resolved_by: string | null;
@@ -404,6 +405,62 @@ export default function BugReportsPage() {
                                         <p className="text-white whitespace-pre-wrap">
                                             {selectedReport.replication_steps}
                                         </p>
+                                    </div>
+                                )}
+
+                                {/* Media Files */}
+                                {selectedReport.media_urls && selectedReport.media_urls.length > 0 && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-zinc-400 mb-2">
+                                            Screenshots / Videos
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {selectedReport.media_urls.map((url, index) => {
+                                                const isVideo = url.match(/\.(mp4|webm|mov)$/i) || url.includes('video');
+                                                return (
+                                                    <div
+                                                        key={index}
+                                                        className="relative rounded-lg overflow-hidden bg-zinc-800 border border-zinc-700"
+                                                    >
+                                                        {isVideo ? (
+                                                            <video
+                                                                src={url}
+                                                                className="w-full h-48 object-cover"
+                                                                controls
+                                                            />
+                                                        ) : (
+                                                            <img
+                                                                src={url}
+                                                                alt={`Screenshot ${index + 1}`}
+                                                                className="w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                                onClick={() => window.open(url, '_blank')}
+                                                            />
+                                                        )}
+                                                        <a
+                                                            href={url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 hover:bg-black/80 rounded text-white text-xs flex items-center gap-1 transition-colors"
+                                                        >
+                                                            <svg
+                                                                className="w-3 h-3"
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                stroke="currentColor"
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    strokeWidth={2}
+                                                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                                                />
+                                                            </svg>
+                                                            Open
+                                                        </a>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 )}
 
