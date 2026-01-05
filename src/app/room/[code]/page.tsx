@@ -101,6 +101,9 @@ export default function RoomPage({
 
     // Safari-specific: Update video elements when tracks change
     // Safari needs explicit srcObject updates when tracks are added/updated
+    // Use a ref to track which tracks we've already attached to avoid flickering
+    const attachedVideoTracksRef = useRef<Map<string, MediaStreamTrack>>(new Map());
+    
     useEffect(() => {
         if (!inCall) return;
 
@@ -108,15 +111,26 @@ export default function RoomPage({
             if (peer.videoTrack) {
                 const videoEl = remoteVideoRefs.current.get(peerId);
                 if (videoEl) {
-                    // Safari needs explicit updates - always set srcObject
-                    const stream = new MediaStream([peer.videoTrack]);
-                    if (videoEl.srcObject !== stream) {
-                        videoEl.srcObject = stream;
-                        videoEl.play().catch((e) => {
-                            console.warn(`[Room] Safari video play failed for ${peerId}:`, e);
-                        });
+                    const previousTrack = attachedVideoTracksRef.current.get(peerId);
+                    
+                    // Only update if the track has actually changed
+                    if (previousTrack !== peer.videoTrack) {
+                        const stream = new MediaStream([peer.videoTrack]);
+                        const currentStream = videoEl.srcObject as MediaStream;
+                        
+                        // Check if we need to update - only if track changed or no stream
+                        if (!currentStream || currentStream.getVideoTracks()[0] !== peer.videoTrack) {
+                            videoEl.srcObject = stream;
+                            videoEl.play().catch((e) => {
+                                console.warn(`[Room] Safari video play failed for ${peerId}:`, e);
+                            });
+                            attachedVideoTracksRef.current.set(peerId, peer.videoTrack);
+                        }
                     }
                 }
+            } else {
+                // Clean up if track was removed
+                attachedVideoTracksRef.current.delete(peerId);
             }
         });
     }, [remotePeers, inCall]);
