@@ -3419,21 +3419,27 @@ function DashboardContent({
                                     />
                                     <div className="flex items-center gap-2">
                                         <button
-                                            onClick={() => {
+                                            onClick={async () => {
+                                                // Ensure permanent room exists first
+                                                try {
+                                                    await fetch(`/api/rooms/permanent?wallet_address=${userAddress}`);
+                                                } catch (err) {
+                                                    console.error("Failed to ensure room exists:", err);
+                                                }
+                                                
+                                                // Copy link using same method as working scheduling link
                                                 const link = `${window.location.origin}/room/${userAddress}`;
-                                                navigator.clipboard.writeText(link).then(() => {
-                                                    // Show feedback
-                                                    const btn = document.activeElement as HTMLElement;
-                                                    const original = btn?.textContent;
-                                                    if (btn) {
-                                                        btn.textContent = "Copied!";
-                                                        setTimeout(() => {
-                                                            if (btn) btn.textContent = original || "Copy Link";
-                                                        }, 2000);
-                                                    }
-                                                }).catch((err) => {
-                                                    console.error("Failed to copy:", err);
-                                                });
+                                                navigator.clipboard.writeText(link);
+                                                
+                                                // Show feedback
+                                                const btn = document.activeElement as HTMLElement;
+                                                const original = btn?.textContent;
+                                                if (btn) {
+                                                    btn.textContent = "Copied!";
+                                                    setTimeout(() => {
+                                                        if (btn) btn.textContent = original || "Copy Link";
+                                                    }, 2000);
+                                                }
                                             }}
                                             className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap"
                                         >
@@ -3621,19 +3627,7 @@ function DashboardContent({
                                         : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                                 }`}
                             >
-                                <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                                    />
-                                </svg>
+                                <span className="text-lg">🐛</span>
                                 <span className="text-[10px] font-medium">Report</span>
                             </button>
 

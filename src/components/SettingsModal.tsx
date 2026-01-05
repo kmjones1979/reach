@@ -484,15 +484,11 @@ export function SettingsModal({
                                                         }
                                                     }
                                                     
-                                                    // Use same method as working scheduling link
+                                                    // Use exact same method as working scheduling link
                                                     const profileUrl = `${window.location.origin}/user/${profilePath}`;
-                                                    
-                                                    navigator.clipboard.writeText(profileUrl).then(() => {
-                                                        setCopiedLink(true);
-                                                        setTimeout(() => setCopiedLink(false), 2000);
-                                                    }).catch((err) => {
-                                                        console.error("[Settings] Failed to copy link:", err);
-                                                    });
+                                                    navigator.clipboard.writeText(profileUrl);
+                                                    setCopiedLink(true);
+                                                    setTimeout(() => setCopiedLink(false), 2000);
                                                 }}
                                                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400"
                                             >
