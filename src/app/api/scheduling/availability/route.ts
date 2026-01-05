@@ -107,7 +107,12 @@ export async function GET(request: NextRequest) {
                 // Check minimum advance notice
                 const advanceNoticeHours = settings.scheduling_advance_notice_hours || 24;
                 const minStartTime = new Date(Date.now() + advanceNoticeHours * 60 * 60 * 1000);
+                const now = new Date();
+                
+                console.log(`[Scheduling] Window ${window.day_of_week} (${window.start_time}-${window.end_time}): slotStartUTC=${slotStartUTC.toISOString()}, minStartTime=${minStartTime.toISOString()}, now=${now.toISOString()}, advanceNoticeHours=${advanceNoticeHours}`);
+                
                 if (slotStartUTC < minStartTime) {
+                    console.log(`[Scheduling] Skipping window ${window.day_of_week} - slotStartUTC (${slotStartUTC.toISOString()}) is before minStartTime (${minStartTime.toISOString()})`);
                     continue;
                 }
 
@@ -130,6 +135,7 @@ export async function GET(request: NextRequest) {
                 const duration = slotGenerationDuration;
 
                 let currentSlotStart = new Date(slotStartUTC);
+                let slotCount = 0;
                 while (currentSlotStart.getTime() + slotDuration * 60 * 1000 <= slotEndUTC.getTime()) {
                     const currentSlotEnd = new Date(currentSlotStart.getTime() + duration * 60 * 1000);
                     potentialSlots.push({
@@ -137,8 +143,10 @@ export async function GET(request: NextRequest) {
                         end: currentSlotEnd,
                         dayOfWeek,
                     });
+                    slotCount++;
                     currentSlotStart = new Date(currentSlotStart.getTime() + slotDuration * 60 * 1000);
                 }
+                console.log(`[Scheduling] Generated ${slotCount} potential slots for day ${dayOfWeek} (${window.start_time}-${window.end_time})`);
             }
 
             current.setDate(current.getDate() + 1);
@@ -258,6 +266,11 @@ export async function GET(request: NextRequest) {
         }
 
         // Format slots for response (all times in UTC)
+        console.log(`[Scheduling] Final result: ${availableSlots.length} available slots after filtering`);
+        if (availableSlots.length > 0) {
+            console.log(`[Scheduling] First 5 slots:`, availableSlots.slice(0, 5).map(s => ({ start: s.start.toISOString(), end: s.end.toISOString(), dayOfWeek: s.dayOfWeek })));
+        }
+        
         const formattedSlots = availableSlots.map((slot) => ({
             start: slot.start.toISOString(),
             end: slot.end.toISOString(),
