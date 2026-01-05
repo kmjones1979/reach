@@ -1287,6 +1287,24 @@ export default function RoomPage({
                 );
 
                 try {
+                    // Ensure microphone audio is enabled before starting screen share
+                    try {
+                        await localPeer.enableAudio();
+                        console.log("[Room] Ensured microphone audio is enabled before screen share");
+                    } catch (audioErr) {
+                        console.warn("[Room] Could not ensure audio is enabled:", audioErr);
+                    }
+
+                    // Ensure camera video is still enabled (if not already off)
+                    if (!isVideoOff) {
+                        try {
+                            await localPeer.enableVideo();
+                            console.log("[Room] Ensured camera video is enabled before screen share");
+                        } catch (videoErr) {
+                            console.warn("[Room] Could not ensure video is enabled:", videoErr);
+                        }
+                    }
+
                     // Method 1: Try startScreenShare on localPeer
                     if (typeof localPeer.startScreenShare === "function") {
                         console.log(
@@ -1296,6 +1314,19 @@ export default function RoomPage({
                         console.log("[Room] startScreenShare result:", result);
                         setIsScreenSharing(true);
                         // Stream will come through stream-playable event
+                        
+                        // Re-ensure audio/video after screen share starts
+                        setTimeout(async () => {
+                            try {
+                                await localPeer.enableAudio();
+                                if (!isVideoOff) {
+                                    await localPeer.enableVideo();
+                                }
+                                console.log("[Room] Re-ensured audio/video after screen share started");
+                            } catch (err) {
+                                console.warn("[Room] Could not re-ensure audio/video:", err);
+                            }
+                        }, 500);
                     }
                     // Method 2: Try produceScreenShare on localPeer
                     else if (
@@ -1311,6 +1342,19 @@ export default function RoomPage({
                         );
                         setIsScreenSharing(true);
                         // Stream will come through stream-playable event
+                        
+                        // Re-ensure audio/video after screen share starts
+                        setTimeout(async () => {
+                            try {
+                                await localPeer.enableAudio();
+                                if (!isVideoOff) {
+                                    await localPeer.enableVideo();
+                                }
+                                console.log("[Room] Re-ensured audio/video after screen share started");
+                            } catch (err) {
+                                console.warn("[Room] Could not re-ensure audio/video:", err);
+                            }
+                        }, 500);
                     }
                     // Method 3: Try startScreenShare on room
                     else if (
@@ -1323,6 +1367,19 @@ export default function RoomPage({
                         await room.startScreenShare();
                         setIsScreenSharing(true);
                         // Stream will come through stream-playable event
+                        
+                        // Re-ensure audio/video after screen share starts
+                        setTimeout(async () => {
+                            try {
+                                await localPeer.enableAudio();
+                                if (!isVideoOff) {
+                                    await localPeer.enableVideo();
+                                }
+                                console.log("[Room] Re-ensured audio/video after screen share started");
+                            } catch (err) {
+                                console.warn("[Room] Could not re-ensure audio/video:", err);
+                            }
+                        }, 500);
                     }
                     // Method 4: Manual getDisplayMedia + produce
                     else {
@@ -1330,12 +1387,13 @@ export default function RoomPage({
                             "[Room] Using manual getDisplayMedia + produce method"
                         );
                         // Method 3: Get screen stream manually and produce it
+                        // IMPORTANT: Don't request audio from screen share - we want to keep microphone audio separate
                         const screenStream =
                             await navigator.mediaDevices.getDisplayMedia({
                                 video: {
                                     displaySurface: "monitor",
                                 } as MediaTrackConstraints,
-                                audio: true,
+                                audio: false, // Don't capture screen audio - keep microphone audio separate
                             });
                         console.log(
                             "[Room] Got screen stream via getDisplayMedia"
@@ -1343,11 +1401,29 @@ export default function RoomPage({
 
                         // Produce the screen stream - try different produce methods
                         const videoTrack = screenStream.getVideoTracks()[0];
-                        const audioTrack = screenStream.getAudioTracks()[0];
+                        // Note: We're NOT using screen share audio - microphone audio should remain active
 
                         if (!videoTrack) {
                             screenStream.getTracks().forEach((t) => t.stop());
                             throw new Error("No video track in screen stream");
+                        }
+
+                        // Ensure microphone audio is still enabled before producing screen share
+                        try {
+                            await localPeer.enableAudio();
+                            console.log("[Room] Ensured microphone audio is enabled before screen share");
+                        } catch (audioErr) {
+                            console.warn("[Room] Could not ensure audio is enabled:", audioErr);
+                        }
+
+                        // Ensure camera video is still enabled (if not already off)
+                        if (!isVideoOff) {
+                            try {
+                                await localPeer.enableVideo();
+                                console.log("[Room] Ensured camera video is enabled before screen share");
+                            } catch (videoErr) {
+                                console.warn("[Room] Could not ensure video is enabled:", videoErr);
+                            }
                         }
 
                         let produced = false;
@@ -1430,6 +1506,19 @@ export default function RoomPage({
                                 );
                         }
                         setIsScreenSharing(true);
+                        
+                        // Re-ensure audio/video after screen share starts (screen share shouldn't stop them)
+                        setTimeout(async () => {
+                            try {
+                                await localPeer.enableAudio();
+                                if (!isVideoOff) {
+                                    await localPeer.enableVideo();
+                                }
+                                console.log("[Room] Re-ensured audio/video after manual screen share started");
+                            } catch (err) {
+                                console.warn("[Room] Could not re-ensure audio/video:", err);
+                            }
+                        }, 500);
                     }
                 } catch (shareErr: any) {
                     console.error("[Room] Screen share error:", shareErr);
