@@ -78,6 +78,13 @@ if (typeof window !== "undefined") {
         // Create Solana adapter
         const solanaAdapter = new SolanaAdapter();
 
+        // Check if running as PWA
+        const isPWA = typeof window !== "undefined" && (
+            window.matchMedia("(display-mode: standalone)").matches ||
+            // @ts-expect-error - iOS Safari specific
+            window.navigator.standalone === true
+        );
+
         // Initialize with both EVM and Solana
         createAppKit({
             adapters: [wagmiAdapter, solanaAdapter],
@@ -100,6 +107,26 @@ if (typeof window !== "undefined") {
                 "--w3m-accent": "#8b5cf6",
                 "--w3m-border-radius-master": "2px",
             },
+            // PWA-specific: Feature Rainbow and MetaMask at top, show wallets before social
+            ...(isPWA && {
+                featuredWalletIds: [
+                    "c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96", // Rainbow
+                    "c03dfee351b6fcc421b4494ea33b9d4b5a6efac8f435ed0df3a402880992c61b", // MetaMask
+                ],
+                includeWalletIds: [
+                    // Featured wallets first
+                    "c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96", // Rainbow
+                    "c03dfee351b6fcc421b4494ea33b9d4b5a6efac8f435ed0df3a402880992c61b", // MetaMask
+                    // Other popular wallets
+                    "4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0", // Coinbase Wallet
+                    "ef333840daf915aafdc4a004525502d6d49d77bd9c65e0642dbaefb3c2893bef", // Trust Wallet
+                    "1ae92b26df02f0abca6304df07debccd18262fdf5fe82daa81593582dac9a202", // Phantom
+                    "19177a98252e07ddfc9af2083ba8e07ef627cb6103467ffebb3f8f4205fd7927", // Solflare
+                ],
+            }),
+            // Optimize wallet discovery and social login performance
+            enableEIP6963: true, // Use EIP-6963 for faster wallet discovery
+            enableCoinbase: true,
         });
 
         setTimeout(() => {
