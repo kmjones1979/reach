@@ -4,7 +4,21 @@ import { createLivepeerStream, getLivepeerStream, getPlaybackUrl } from "@/lib/l
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+        db: {
+            schema: "public",
+        },
+        global: {
+            fetch: (url, options = {}) => {
+                return fetch(url, {
+                    ...options,
+                    // Add timeout to prevent hanging requests
+                    signal: AbortSignal.timeout(15000), // 15 second timeout
+                });
+            },
+        },
+    }
 );
 
 export type Stream = {
@@ -43,14 +57,33 @@ export async function GET(request: NextRequest) {
         query = query.eq("status", "live");
     }
 
-    const { data: streams, error } = await query;
+    let streams, error;
+    try {
+        // Add timeout wrapper for the query
+        const queryPromise = query;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Query timeout after 10 seconds")), 10000)
+        );
+        
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+        streams = result.data;
+        error = result.error;
+    } catch (timeoutError) {
+        console.error("[Streams API] Query timeout or error:", timeoutError);
+        // Return empty array on timeout rather than failing completely
+        streams = [];
+        error = null;
+    }
 
     if (error) {
-        console.error("[Streams API] Error fetching streams:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch streams" },
-            { status: 500 }
-        );
+        console.error("[Streams API] Error fetching streams:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+        });
+        // Return empty array on error to prevent complete failure
+        streams = [];
     }
 
     // For live streams, verify with Livepeer that they're actually broadcasting
@@ -61,7 +94,8 @@ export async function GET(request: NextRequest) {
         const GRACE_PERIOD_MS = 60000; // 60 seconds grace period for new streams
         const now = Date.now();
         
-        const verifiedStreams = await Promise.all(
+        // Add timeout to Livepeer verification to prevent hanging
+        const verifiedStreams = await Promise.allSettled(
             filteredStreams.map(async (stream) => {
                 // Check if stream started recently (within grace period)
                 const startedAt = stream.started_at ? new Date(stream.started_at).getTime() : 0;
@@ -72,17 +106,33 @@ export async function GET(request: NextRequest) {
                     return stream;
                 }
                 
-                // For older streams, verify they're actually active
+                // For older streams, verify they're actually active (with timeout)
                 if (stream.stream_id) {
-                    const livepeerStream = await getLivepeerStream(stream.stream_id);
-                    if (livepeerStream?.isActive) {
+                    try {
+                        const livepeerStream = await Promise.race([
+                            getLivepeerStream(stream.stream_id),
+                            new Promise<null>((_, reject) =>
+                                setTimeout(() => reject(new Error("Livepeer timeout")), 5000)
+                            ),
+                        ]);
+                        if (livepeerStream?.isActive) {
+                            return stream;
+                        }
+                    } catch (livepeerError) {
+                        // If Livepeer check fails/times out, include the stream anyway
+                        // Better to show potentially inactive streams than fail completely
+                        console.warn(`[Streams API] Livepeer check failed for stream ${stream.id}:`, livepeerError);
                         return stream;
                     }
                 }
                 return null;
             })
         );
-        filteredStreams = verifiedStreams.filter(Boolean) as typeof streams;
+        
+        // Filter out failed promises and null values
+        filteredStreams = verifiedStreams
+            .filter((result) => result.status === "fulfilled" && result.value !== null)
+            .map((result) => (result as PromiseFulfilledResult<typeof streams[0]>).value);
     }
 
     // Add playback URLs

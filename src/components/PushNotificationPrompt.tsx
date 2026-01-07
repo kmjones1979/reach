@@ -47,25 +47,57 @@ export function PushNotificationPrompt({
 
         // If already shown in this session, don't show again
         if (hasShownRef.current) {
+            console.log("[PushNotificationPrompt] Already shown in this session");
             return;
         }
 
-        if (!userAddress || !isSupported || isSubscribed) {
+        if (!userAddress) {
+            console.log("[PushNotificationPrompt] No user address");
             return;
         }
 
-        // Don't show if permission already denied
-        if (permission === "denied") {
+        if (!isSupported) {
+            console.log("[PushNotificationPrompt] Push notifications not supported");
             return;
         }
 
         // Check if already prompted for this specific address
-        // This allows showing the prompt again if user logs in with a different method/address
+        // BUT: Always show if user doesn't have a username (they need to claim one)
         const promptedKey = `${PUSH_PROMPTED_KEY}_${userAddress.toLowerCase()}`;
         const hasPrompted = localStorage.getItem(promptedKey);
-        if (hasPrompted) {
+        
+        // If user doesn't have a username, always show the prompt (even if prompted before)
+        // This ensures they can claim a username
+        if (hasPrompted && currentUsername) {
+            console.log("[PushNotificationPrompt] Already prompted for this address and has username");
             return;
         }
+        
+        // If prompted before but no username, log and continue to show
+        if (hasPrompted && !currentUsername) {
+            console.log("[PushNotificationPrompt] Already prompted but no username - showing again to claim username");
+        }
+
+        // Don't show if permission already denied (but still show if default/prompt)
+        if (permission === "denied") {
+            console.log("[PushNotificationPrompt] Permission already denied");
+            return;
+        }
+
+        // Show even if subscribed - we still want to show username claim if they don't have one
+        // Only skip if they have both username AND are subscribed
+        if (isSubscribed && currentUsername) {
+            console.log("[PushNotificationPrompt] Already subscribed and has username");
+            return;
+        }
+
+        console.log("[PushNotificationPrompt] Will show prompt in 2 seconds", {
+            userAddress,
+            isSupported,
+            isSubscribed,
+            permission,
+            currentUsername,
+        });
 
         // Show prompt after a short delay (let the app settle first)
         timerRef.current = setTimeout(() => {
@@ -81,6 +113,7 @@ export function PushNotificationPrompt({
             } else {
                 setStep("username");
             }
+            console.log("[PushNotificationPrompt] Prompt opened, step:", currentUsername ? "notifications" : "username");
         }, 2000);
 
         return () => {

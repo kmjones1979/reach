@@ -93,11 +93,17 @@ export async function getLivepeerStream(streamId: string): Promise<LivepeerStrea
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
         const response = await fetch(`${LIVEPEER_API_URL}/stream/${streamId}`, {
             headers: {
                 Authorization: `Bearer ${LIVEPEER_API_KEY}`,
             },
+            signal: controller.signal,
         });
+        
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             return null;
@@ -115,7 +121,11 @@ export async function getLivepeerStream(streamId: string): Promise<LivepeerStrea
             createdAt: data.createdAt,
         };
     } catch (error) {
-        console.error("[Livepeer] Error getting stream:", error);
+        if (error instanceof Error && error.name === "AbortError") {
+            console.warn("[Livepeer] Stream check timeout for:", streamId);
+        } else {
+            console.error("[Livepeer] Error getting stream:", error);
+        }
         return null;
     }
 }
