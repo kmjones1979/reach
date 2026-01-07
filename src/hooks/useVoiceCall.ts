@@ -370,6 +370,69 @@ export function useVoiceCall() {
         [startDurationTimer]
     );
 
+    // Aggressive media track cleanup for iOS
+    const stopAllMediaTracks = useCallback(() => {
+        const allTracks: MediaStreamTrack[] = [];
+        const trackIds = new Set<string>();
+
+        // Collect tracks from all video elements in DOM
+        try {
+            const videoElements = document.querySelectorAll("video");
+            videoElements.forEach((video) => {
+                const stream = video.srcObject as MediaStream;
+                if (stream) {
+                    stream.getTracks().forEach((track) => {
+                        if (!trackIds.has(track.id)) {
+                            allTracks.push(track);
+                            trackIds.add(track.id);
+                        }
+                    });
+                    video.srcObject = null;
+                }
+            });
+        } catch (e) {
+            console.log("[Call] Error collecting video tracks:", e);
+        }
+
+        // Collect tracks from all audio elements in DOM
+        try {
+            const audioElements = document.querySelectorAll("audio");
+            audioElements.forEach((audio) => {
+                const stream = audio.srcObject as MediaStream;
+                if (stream) {
+                    stream.getTracks().forEach((track) => {
+                        if (!trackIds.has(track.id)) {
+                            allTracks.push(track);
+                            trackIds.add(track.id);
+                        }
+                    });
+                    audio.srcObject = null;
+                }
+            });
+        } catch (e) {
+            console.log("[Call] Error collecting audio tracks:", e);
+        }
+
+        // Stop all collected tracks
+        allTracks.forEach((track) => {
+            try {
+                track.stop();
+                console.log("[Call] Stopped track:", track.kind, track.id);
+            } catch (e) {
+                console.log("[Call] Error stopping track:", e);
+            }
+        });
+
+        // Also try to enumerate and stop all media devices
+        try {
+            navigator.mediaDevices.enumerateDevices().then((devices) => {
+                console.log("[Call] Found devices after cleanup:", devices.length);
+            });
+        } catch (e) {
+            console.log("[Call] Error enumerating devices:", e);
+        }
+    }, []);
+
     const leaveCall = useCallback(async () => {
         // Signal abort if join is in progress
         if (isJoiningRef.current) {
@@ -420,6 +483,35 @@ export function useVoiceCall() {
             remoteVideoTrackRef.current = null;
             isJoiningRef.current = false;
 
+            // IMMEDIATE cleanup - don't wait for anything
+            stopAllMediaTracks();
+
+            // Additional aggressive cleanup passes with delays for iOS (non-blocking)
+            setTimeout(() => {
+                console.log("[Call] Cleanup pass 1 (200ms)");
+                stopAllMediaTracks();
+            }, 200);
+
+            setTimeout(() => {
+                console.log("[Call] Cleanup pass 2 (400ms)");
+                stopAllMediaTracks();
+            }, 400);
+
+            setTimeout(() => {
+                console.log("[Call] Cleanup pass 3 (600ms)");
+                stopAllMediaTracks();
+            }, 600);
+
+            setTimeout(() => {
+                console.log("[Call] Cleanup pass 4 (1000ms)");
+                stopAllMediaTracks();
+            }, 1000);
+
+            setTimeout(() => {
+                console.log("[Call] Cleanup pass 5 (2000ms)");
+                stopAllMediaTracks();
+            }, 2000);
+
             setState({
                 callState: "idle",
                 callType: "audio",
@@ -435,12 +527,14 @@ export function useVoiceCall() {
         } catch (error) {
             console.error("Error leaving call:", error);
             isJoiningRef.current = false;
+            // Still do cleanup even on error
+            stopAllMediaTracks();
             setState((prev) => ({
                 ...prev,
                 callState: "idle",
             }));
         }
-    }, [stopDurationTimer]);
+    }, [stopDurationTimer, stopAllMediaTracks]);
 
     const toggleMute = useCallback(() => {
         if (localAudioTrackRef.current) {
