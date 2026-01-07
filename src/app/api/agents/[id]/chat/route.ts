@@ -897,6 +897,7 @@ You can help users schedule meetings with your creator. When users ask about sch
                 // Include schema information for GraphQL APIs so the agent knows what queries are available
                 if (tool.apiType === "graphql" && tool.schema) {
                     systemInstructions += `\n  GraphQL Schema:\n${tool.schema}`;
+                    systemInstructions += `\n  IMPORTANT: You can use this GraphQL API to query for lists of items. Look for plural query names (e.g., graphNetworks, dataServices, subgraphs) in the schema to list collections. Use these queries when users ask "what are available", "list all", "show me", etc.`;
                 } else if (tool.schema) {
                     // For other API types, include schema as context
                     systemInstructions += `\n  API Schema:\n${tool.schema}`;
@@ -1020,9 +1021,13 @@ RULES:
 3. Make it a valid GraphQL query
 4. Use the schema information above to create an accurate query
 5. Include relevant fields that would answer the user's question
+6. For questions asking "what are available" or "list all" or "show me", use plural query names (e.g., graphNetworks, dataServices, subgraphs) with appropriate pagination (first: 100 or similar)
+7. If the question asks for a list/collection, use the plural query form from the schema
 
-Example format:
-{ domains(first: 3, orderBy: registeredAt, orderDirection: desc) { id name registeredAt } }` }]
+Example formats:
+- List query: { graphNetworks(first: 100) { id name } }
+- Single item: { graphNetwork(id: "0x123") { id name } }
+- With filters: { subgraphs(first: 50, where: { active: true }) { id displayName } }` }]
                                     }],
                                     config: { maxOutputTokens: 500 }
                                 });
