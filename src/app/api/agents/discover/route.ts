@@ -94,13 +94,8 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // Apply search filter (name, personality, and tags)
-        if (search) {
-            const searchLower = search.toLowerCase();
-            // Search in name, personality, and tags array
-            query = query.or(`name.ilike.%${search}%,personality.ilike.%${search}%,tags.cs.["${searchLower}"]`);
-        }
-
+        // Note: We'll filter by search term (name, personality, and tags) in JavaScript
+        // to support partial matching in tags, which isn't easily done in Supabase queries
         const { data: agents, error } = await query;
 
         console.log("[Discover] Query result - agents found:", agents?.length || 0);
@@ -129,11 +124,32 @@ export async function GET(request: NextRequest) {
         });
 
         // Enrich agents with owner info and friend status
-        const enrichedAgents = (agents || []).map(agent => ({
+        let enrichedAgents = (agents || []).map(agent => ({
             ...agent,
             owner: ownerMap.get(agent.owner_address) || {},
             isFriendsAgent: friendAddresses.has(agent.owner_address),
         }));
+
+        // Filter by search term if provided (name, personality, and tags - case-insensitive partial match)
+        if (search) {
+            const searchLower = search.toLowerCase().trim();
+            enrichedAgents = enrichedAgents.filter(agent => {
+                // Check name match
+                const nameMatch = agent.name?.toLowerCase().includes(searchLower);
+                
+                // Check personality match
+                const personalityMatch = agent.personality?.toLowerCase().includes(searchLower);
+                
+                // Check if any tag contains the search term (case-insensitive partial match)
+                const tagMatch = agent.tags && Array.isArray(agent.tags) && 
+                    agent.tags.some((tag: string) => 
+                        tag.toLowerCase().includes(searchLower)
+                    );
+                
+                // Return true if any field matches
+                return nameMatch || personalityMatch || tagMatch;
+            });
+        }
 
         return NextResponse.json({
             agents: enrichedAgents,
