@@ -127,11 +127,11 @@ function DashboardContent({
     const [isInvitesModalOpen, setIsInvitesModalOpen] = useState(false);
     const [showWakuSuccess, setShowWakuSuccess] = useState(false);
     const [showSolanaBanner, setShowSolanaBanner] = useState(true);
-    
+
     // Live streaming state
     const [isGoLiveModalOpen, setIsGoLiveModalOpen] = useState(false);
     // watchingStream state removed - now using /live/[id] page instead
-    
+
     // Bottom navigation tab state - default to chats
     type NavTab = "agents" | "friends" | "chats" | "calls" | "leaderboard";
     const [activeNavTab, setActiveNavTab] = useState<NavTab>("chats");
@@ -269,17 +269,14 @@ function DashboardContent({
     } = usePushNotifications(userAddress);
 
     // Track user login for admin analytics
-    const { 
-        dailyBonusAvailable, 
-        claimDailyBonus, 
-        isClaimingBonus 
-    } = useLoginTracking({
-        walletAddress: userAddress,
-        walletType,
-        chain: isSolanaUser ? "solana" : "ethereum",
-        ensName: userENS.ensName,
-        username: reachUsername,
-    });
+    const { dailyBonusAvailable, claimDailyBonus, isClaimingBonus } =
+        useLoginTracking({
+            walletAddress: userAddress,
+            walletType,
+            chain: isSolanaUser ? "solana" : "ethereum",
+            ensName: userENS.ensName,
+            username: reachUsername,
+        });
 
     // State for daily bonus modal
     const [showDailyBonusModal, setShowDailyBonusModal] = useState(false);
@@ -371,51 +368,65 @@ function DashboardContent({
     const allInvitesUsed = usedInvites > 0 && usedInvites === totalInvites;
 
     // Contacts sync state
-    const [contacts, setContacts] = useState<Array<{ name: string; phone?: string; email?: string }>>([]);
+    const [contacts, setContacts] = useState<
+        Array<{ name: string; phone?: string; email?: string }>
+    >([]);
     const [isSyncingContacts, setIsSyncingContacts] = useState(false);
     const [showContactsList, setShowContactsList] = useState(false);
 
     // Check if running as PWA
-    const isPWA = typeof window !== "undefined" && (
-        window.matchMedia("(display-mode: standalone)").matches ||
-        // @ts-expect-error - iOS Safari specific
-        window.navigator.standalone === true
-    );
+    const isPWA =
+        typeof window !== "undefined" &&
+        (window.matchMedia("(display-mode: standalone)").matches ||
+            // @ts-expect-error - iOS Safari specific
+            window.navigator.standalone === true);
 
     // Sync contacts function
     const handleSyncContacts = async () => {
         if (!isPWA) {
-            alert("Contacts sync is only available in the PWA app. Please install the app first.");
+            alert(
+                "Contacts sync is only available in the PWA app. Please install the app first."
+            );
             return;
         }
 
         setIsSyncingContacts(true);
         try {
             // Check if Contacts API is available (limited browser support)
-            if ('contacts' in navigator && 'ContactsManager' in window) {
+            if ("contacts" in navigator && "ContactsManager" in window) {
                 // @ts-expect-error - Contacts API is experimental
                 const contactsManager = new navigator.ContactsManager();
-                const contacts: Array<{ name: string; phone?: string; email?: string }> = await contactsManager.select(['name', 'tel', 'email'], { multiple: true });
+                const contacts: Array<{
+                    name: string;
+                    phone?: string;
+                    email?: string;
+                }> = await contactsManager.select(["name", "tel", "email"], {
+                    multiple: true,
+                });
                 setContacts(contacts);
                 setShowContactsList(true);
             } else {
                 // Fallback: Use Web Share API to share invite link
                 // Get first available invite code
-                const firstInvite = invites.find(inv => !inv.used_by);
+                const firstInvite = invites.find((inv) => !inv.used_by);
                 if (firstInvite) {
                     await shareInvite(firstInvite.code);
                 } else {
-                    alert("No available invite codes. Please generate more invites first.");
+                    alert(
+                        "No available invite codes. Please generate more invites first."
+                    );
                 }
             }
         } catch (error) {
             console.error("Error syncing contacts:", error);
             // Fallback: Use Web Share API
-            const firstInvite = invites.find(inv => !inv.used_by);
+            const firstInvite = invites.find((inv) => !inv.used_by);
             if (firstInvite) {
                 await shareInvite(firstInvite.code);
             } else {
-                alert("Failed to sync contacts. Please try sharing an invite manually.");
+                alert(
+                    "Failed to sync contacts. Please try sharing an invite manually."
+                );
             }
         } finally {
             setIsSyncingContacts(false);
@@ -436,7 +447,9 @@ function DashboardContent({
     const [isBugReportModalOpen, setIsBugReportModalOpen] = useState(false);
 
     // Cache for user info fetched from API
-    const [userInfoCache, setUserInfoCache] = useState<Map<string, { name: string | null; avatar: string | null }>>(new Map());
+    const [userInfoCache, setUserInfoCache] = useState<
+        Map<string, { name: string | null; avatar: string | null }>
+    >(new Map());
 
     const { resolveAddressOrENS } = useENS();
 
@@ -474,44 +487,55 @@ function DashboardContent({
         if (!alphaChat.messages || alphaChat.messages.length === 0) return;
 
         const uniqueSenders = new Set<string>();
-        alphaChat.messages.forEach(msg => {
+        alphaChat.messages.forEach((msg) => {
             const sender = msg.sender_address.toLowerCase();
             // Skip current user and friends (already handled)
-            if (sender !== userAddress.toLowerCase() && 
-                !friends.some(f => f.friend_address.toLowerCase() === sender)) {
+            if (
+                sender !== userAddress.toLowerCase() &&
+                !friends.some((f) => f.friend_address.toLowerCase() === sender)
+            ) {
                 uniqueSenders.add(sender);
             }
         });
 
         // Only fetch for senders not in cache
         const sendersToFetch = Array.from(uniqueSenders).filter(
-            address => !userInfoCache.has(address)
+            (address) => !userInfoCache.has(address)
         );
 
         // Fetch user info for all unique senders not in cache
-        sendersToFetch.forEach(address => {
+        sendersToFetch.forEach((address) => {
             fetch(`/api/public/user?address=${encodeURIComponent(address)}`)
-                .then(res => res.json())
-                .then(data => {
+                .then((res) => res.json())
+                .then((data) => {
                     if (data.user) {
-                        const name = data.user.username 
-                            ? `@${data.user.username}` 
-                            : data.user.display_name || data.user.ens_name || null;
+                        const name = data.user.username
+                            ? `@${data.user.username}`
+                            : data.user.display_name ||
+                              data.user.ens_name ||
+                              null;
                         const userInfo = {
                             name,
                             avatar: data.user.avatar_url || null,
                         };
-                        setUserInfoCache(prev => {
+                        setUserInfoCache((prev) => {
                             // Check again to avoid race conditions
                             if (prev.has(address.toLowerCase())) {
                                 return prev;
                             }
-                            return new Map(prev).set(address.toLowerCase(), userInfo);
+                            return new Map(prev).set(
+                                address.toLowerCase(),
+                                userInfo
+                            );
                         });
                     }
                 })
-                .catch(err => {
-                    console.error("[Dashboard] Error fetching user info for", address, err);
+                .catch((err) => {
+                    console.error(
+                        "[Dashboard] Error fetching user info for",
+                        address,
+                        err
+                    );
                 });
         });
     }, [alphaChat.messages, userAddress, friends]); // Removed userInfoCache from deps to avoid infinite loops
@@ -532,7 +556,10 @@ function DashboardContent({
             if (resolved && isMounted) {
                 // Only update state if values actually changed
                 setUserENS((prev) => {
-                    if (prev.ensName === resolved.ensName && prev.avatar === resolved.avatar) {
+                    if (
+                        prev.ensName === resolved.ensName &&
+                        prev.avatar === resolved.avatar
+                    ) {
                         return prev; // No change, don't trigger re-render
                     }
                     return {
@@ -551,7 +578,11 @@ function DashboardContent({
 
     // Separate effect to award ENS points - only runs when hasClaimed state is ready
     useEffect(() => {
-        if (userENS.ensName && !ensPointsAttemptedRef.current && !hasClaimed("ens_primary")) {
+        if (
+            userENS.ensName &&
+            !ensPointsAttemptedRef.current &&
+            !hasClaimed("ens_primary")
+        ) {
             ensPointsAttemptedRef.current = true;
             awardUserPoints("ens_primary");
         }
@@ -621,13 +652,13 @@ function DashboardContent({
     } = useCallSignaling(userAddress);
 
     // Call history tracking
-    const { 
-        calls: callHistory, 
-        isLoading: isCallHistoryLoading, 
-        error: callHistoryError, 
+    const {
+        calls: callHistory,
+        isLoading: isCallHistoryLoading,
+        error: callHistoryError,
         fetchCallHistory,
-        logCall, 
-        updateCall 
+        logCall,
+        updateCall,
     } = useCallHistory(userAddress);
     const [currentCallId, setCurrentCallId] = useState<string | null>(null);
     const [callStartTime, setCallStartTime] = useState<Date | null>(null);
@@ -635,7 +666,7 @@ function DashboardContent({
     const [showNewScheduledModal, setShowNewScheduledModal] = useState(false);
     const [showNewCallModal, setShowNewCallModal] = useState(false);
     const [isRejectingCall, setIsRejectingCall] = useState(false);
-    
+
     // Live streaming
     const {
         liveStreams,
@@ -647,9 +678,11 @@ function DashboardContent({
     } = useStreams(userAddress);
 
     // Public channels
-    const { joinedChannels, leaveChannel, fetchJoinedChannels } = useChannels(userAddress);
+    const { joinedChannels, leaveChannel, fetchJoinedChannels } =
+        useChannels(userAddress);
     const [isBrowseChannelsOpen, setIsBrowseChannelsOpen] = useState(false);
-    const [selectedChannel, setSelectedChannel] = useState<PublicChannel | null>(null);
+    const [selectedChannel, setSelectedChannel] =
+        useState<PublicChannel | null>(null);
 
     // Waku works with both EVM and Solana addresses
     const wakuContext = useXMTPContext();
@@ -790,38 +823,45 @@ function DashboardContent({
     };
 
     // Get user info for Alpha chat - checks friends list and returns name/avatar
-    const getAlphaUserInfo = useCallback((address: string) => {
-        const normalizedAddress = address.toLowerCase();
-        
-        // Check if it's the current user
-        if (normalizedAddress === userAddress.toLowerCase()) {
-            return {
-                name: reachUsername || userENS?.ensName || null,
-                avatar: userENS?.avatar || null,
-            };
-        }
-        
-        // Check friends list
-        const friend = friends.find(
-            f => f.friend_address.toLowerCase() === normalizedAddress
-        );
-        
-        if (friend) {
-            return {
-                name: friend.nickname || friend.reachUsername || friend.ensName || null,
-                avatar: friend.avatar || null,
-            };
-        }
-        
-        // Check cache
-        const cached = userInfoCache.get(normalizedAddress);
-        if (cached) {
-            return cached;
-        }
-        
-        // Return null if not found (will be fetched by useEffect)
-        return null;
-    }, [userAddress, friends, reachUsername, userENS, userInfoCache]);
+    const getAlphaUserInfo = useCallback(
+        (address: string) => {
+            const normalizedAddress = address.toLowerCase();
+
+            // Check if it's the current user
+            if (normalizedAddress === userAddress.toLowerCase()) {
+                return {
+                    name: reachUsername || userENS?.ensName || null,
+                    avatar: userENS?.avatar || null,
+                };
+            }
+
+            // Check friends list
+            const friend = friends.find(
+                (f) => f.friend_address.toLowerCase() === normalizedAddress
+            );
+
+            if (friend) {
+                return {
+                    name:
+                        friend.nickname ||
+                        friend.reachUsername ||
+                        friend.ensName ||
+                        null,
+                    avatar: friend.avatar || null,
+                };
+            }
+
+            // Check cache
+            const cached = userInfoCache.get(normalizedAddress);
+            if (cached) {
+                return cached;
+            }
+
+            // Return null if not found (will be fetched by useEffect)
+            return null;
+        },
+        [userAddress, friends, reachUsername, userENS, userInfoCache]
+    );
 
     // Convert friends to the format FriendsList expects - memoized to prevent unnecessary re-renders
     const friendsListData: FriendsListFriend[] = useMemo(
@@ -865,6 +905,26 @@ function DashboardContent({
             }
         }
     }, [friendsListData]);
+
+    // Handle ?add= parameter to open Add Friend modal
+    useEffect(() => {
+        if (typeof window === "undefined" || !userAddress) return;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const addParam = urlParams.get("add");
+
+        if (addParam) {
+            console.log(
+                "[Dashboard] Opening Add Friend modal from URL param:",
+                addParam
+            );
+            setIsAddFriendOpen(true);
+
+            // Clean up the URL without reloading
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, "", newUrl);
+        }
+    }, [userAddress]);
 
     // Listen for service worker messages to open chat
     useEffect(() => {
@@ -1240,7 +1300,7 @@ function DashboardContent({
             // Pre-fetch all messages for this conversation in background
             // This way when user clicks the toast, messages are already loaded
             prefetchMessages(senderAddress);
-            
+
             // Find friend info for the sender
             const friend = friendsListData.find(
                 (f) => f.address.toLowerCase() === senderAddress.toLowerCase()
@@ -1543,14 +1603,15 @@ function DashboardContent({
         // Prevent multiple rejections from spam clicking
         if (isRejectingCall) return;
         setIsRejectingCall(true);
-        
+
         stopRinging();
         // Log declined call - we are the callee declining a call from the caller
         if (incomingCall?.caller_address && userAddress) {
             await logCall({
                 callerAddress: incomingCall.caller_address, // They called us
                 calleeAddress: userAddress, // We are the callee
-                callType: (incomingCall.call_type as "audio" | "video") || "audio",
+                callType:
+                    (incomingCall.call_type as "audio" | "video") || "audio",
                 status: "declined",
             });
         }
@@ -1583,11 +1644,14 @@ function DashboardContent({
         if (!outgoingCall || !currentCallFriend) return;
 
         const timeout = setTimeout(async () => {
-            console.log("[Dashboard] Outgoing call timed out - marking as missed");
+            console.log(
+                "[Dashboard] Outgoing call timed out - marking as missed"
+            );
             // Log as missed call
             await logCall({
                 calleeAddress: currentCallFriend.address,
-                callType: (outgoingCall.call_type as "audio" | "video") || "audio",
+                callType:
+                    (outgoingCall.call_type as "audio" | "video") || "audio",
                 status: "missed",
             });
             // Cancel the outgoing call
@@ -1597,7 +1661,10 @@ function DashboardContent({
             setCurrentCallProvider(null);
             // Show notification
             setToast({
-                sender: currentCallFriend.ensName || currentCallFriend.nickname || "Friend",
+                sender:
+                    currentCallFriend.ensName ||
+                    currentCallFriend.nickname ||
+                    "Friend",
                 message: "didn't answer",
             });
             setTimeout(() => setToast(null), 4000);
@@ -1620,8 +1687,10 @@ function DashboardContent({
         // Update call history with end time and duration
         if (currentCallId) {
             const endTime = new Date();
-            const durationSeconds = callStartTime 
-                ? Math.round((endTime.getTime() - callStartTime.getTime()) / 1000)
+            const durationSeconds = callStartTime
+                ? Math.round(
+                      (endTime.getTime() - callStartTime.getTime()) / 1000
+                  )
                 : duration;
             await updateCall(currentCallId, {
                 endedAt: endTime.toISOString(),
@@ -1671,27 +1740,31 @@ function DashboardContent({
                                 <button
                                     onClick={() => setIsGoLiveModalOpen(true)}
                                     className="relative group"
-                                    title={currentStream?.status === "live" ? "You're live!" : "Go Live"}
+                                    title={
+                                        currentStream?.status === "live"
+                                            ? "You're live!"
+                                            : "Go Live"
+                                    }
                                 >
                                     {userENS.avatar ? (
                                         <img
                                             src={userENS.avatar}
                                             alt="Avatar"
                                             className={`w-10 h-10 rounded-xl object-cover ring-2 transition-all ${
-                                                currentStream?.status === "live" 
-                                                    ? "ring-red-500 animate-pulse" 
+                                                currentStream?.status === "live"
+                                                    ? "ring-red-500 animate-pulse"
                                                     : "ring-transparent group-hover:ring-[#FF5500]/50"
                                             }`}
                                         />
                                     ) : (
-                                        <SpritzLogo 
-                                            size="md" 
-                                            rounded="xl" 
+                                        <SpritzLogo
+                                            size="md"
+                                            rounded="xl"
                                             className={`ring-2 transition-all ${
                                                 currentStream?.status === "live"
                                                     ? "ring-red-500 animate-pulse"
                                                     : "ring-transparent group-hover:ring-[#FF5500]/50"
-                                            }`} 
+                                            }`}
                                         />
                                     )}
                                     {/* Live badge when streaming */}
@@ -1783,7 +1856,8 @@ function DashboardContent({
                                                 style={{
                                                     // Ensure menu doesn't get cut off on small screens
                                                     // Use dvh for iOS Safari dynamic viewport height
-                                                    maxHeight: 'min(calc(100dvh - 140px), 700px)',
+                                                    maxHeight:
+                                                        "min(calc(100dvh - 140px), 700px)",
                                                 }}
                                             >
                                                 {/* 1. My QR Code */}
@@ -2307,12 +2381,16 @@ function DashboardContent({
                                                         setIsProfileMenuOpen(
                                                             false
                                                         );
-                                                        setActiveNavTab("leaderboard");
+                                                        setActiveNavTab(
+                                                            "leaderboard"
+                                                        );
                                                     }}
                                                     className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800 transition-colors text-left border-t border-zinc-800"
                                                 >
                                                     <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
-                                                        <span className="text-lg">🏆</span>
+                                                        <span className="text-lg">
+                                                            🏆
+                                                        </span>
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-white text-sm font-medium">
@@ -2665,17 +2743,29 @@ function DashboardContent({
                                                 Solana Wallet Connected
                                             </p>
                                             <p className="text-[#FFF0E0]/70 text-sm mt-1">
-                                                Voice calls and encrypted chat are
-                                                available! Some features may vary
-                                                from EVM wallets.
+                                                Voice calls and encrypted chat
+                                                are available! Some features may
+                                                vary from EVM wallets.
                                             </p>
                                         </div>
                                         <button
-                                            onClick={() => setShowSolanaBanner(false)}
+                                            onClick={() =>
+                                                setShowSolanaBanner(false)
+                                            }
                                             className="text-[#FFF0E0]/50 hover:text-[#FFF0E0] transition-colors"
                                         >
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            <svg
+                                                className="w-5 h-5"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M6 18L18 6M6 6l12 12"
+                                                />
                                             </svg>
                                         </button>
                                     </div>
@@ -2850,674 +2940,917 @@ function DashboardContent({
 
                     {/* AI Agents Section - shown when Agents tab selected */}
                     {activeNavTab === "agents" && (
-                        <div id="agents-section" className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
+                        <div
+                            id="agents-section"
+                            className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6"
+                        >
                             <div className="p-6">
-                                <AgentsSection userAddress={userAddress} hasBetaAccess={hasBetaAccess} />
+                                <AgentsSection
+                                    userAddress={userAddress}
+                                    hasBetaAccess={hasBetaAccess}
+                                />
                             </div>
                         </div>
                     )}
 
                     {/* Friends Section - shown when Friends tab selected */}
                     {activeNavTab === "friends" && (
-                    <div id="friends-section" className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
-                        <div className="p-6 border-b border-zinc-800">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-xl font-bold text-white">
-                                        Friends
-                                    </h2>
-                                    <p className="text-zinc-500 text-sm mt-1">
-                                        {friends.length}{" "}
-                                        {friends.length === 1
-                                            ? "friend"
-                                            : "friends"}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {isPWA && (
-                                        <button
-                                            onClick={handleSyncContacts}
-                                            disabled={isSyncingContacts || isInvitesLoading || availableInvites === 0}
-                                            className="py-2 px-3 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium transition-all hover:shadow-lg hover:shadow-blue-500/25 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title="Share invite with friends"
-                                        >
-                                            {isSyncingContacts ? (
-                                                <>
-                                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                    Sharing...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <svg
-                                                        className="w-4 h-4"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                                                        />
-                                                    </svg>
-                                                    Share
-                                                </>
-                                            )}
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => setIsAddFriendOpen(true)}
-                                        disabled={!isSupabaseConfigured}
-                                        className="py-2 px-3 rounded-lg bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <svg
-                                            className="w-4 h-4"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M12 4v16m8-8H4"
-                                            />
-                                        </svg>
-                                        Add Friend
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Contacts List - shown after syncing */}
-                        {showContactsList && contacts.length > 0 && (
-                            <div className="px-6 pt-4 pb-2 border-b border-zinc-800">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-semibold text-white">
-                                        Contacts ({contacts.length})
-                                    </h3>
-                                    <button
-                                        onClick={() => setShowContactsList(false)}
-                                        className="text-zinc-500 hover:text-white text-sm"
-                                    >
-                                        Hide
-                                    </button>
-                                </div>
-                                <div className="space-y-2 max-h-48 overflow-y-auto">
-                                    {contacts.map((contact, idx) => {
-                                        const firstInvite = invites.find(inv => !inv.used_by);
-                                        
-                                        return (
-                                            <div
-                                                key={idx}
-                                                className="flex items-center justify-between p-2 bg-zinc-800/50 rounded-lg"
+                        <div
+                            id="friends-section"
+                            className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden"
+                        >
+                            <div className="p-6 border-b border-zinc-800">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-white">
+                                            Friends
+                                        </h2>
+                                        <p className="text-zinc-500 text-sm mt-1">
+                                            {friends.length}{" "}
+                                            {friends.length === 1
+                                                ? "friend"
+                                                : "friends"}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {isPWA && (
+                                            <button
+                                                onClick={handleSyncContacts}
+                                                disabled={
+                                                    isSyncingContacts ||
+                                                    isInvitesLoading ||
+                                                    availableInvites === 0
+                                                }
+                                                className="py-2 px-3 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium transition-all hover:shadow-lg hover:shadow-blue-500/25 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title="Share invite with friends"
                                             >
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-white text-sm font-medium truncate">
-                                                        {contact.name || "Unknown"}
-                                                    </p>
-                                                    {contact.phone && (
-                                                        <p className="text-zinc-400 text-xs truncate">
-                                                            {contact.phone}
-                                                        </p>
-                                                    )}
-                                                    {contact.email && (
-                                                        <p className="text-zinc-400 text-xs truncate">
-                                                            {contact.email}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                {firstInvite && (
-                                                    <button
-                                                        onClick={async () => {
-                                                            await shareInvite(firstInvite.code);
-                                                        }}
-                                                        className="ml-2 px-3 py-1.5 bg-[#FF5500] hover:bg-[#E04D00] text-white text-xs rounded-lg transition-colors whitespace-nowrap"
-                                                    >
-                                                        Send Invite
-                                                    </button>
+                                                {isSyncingContacts ? (
+                                                    <>
+                                                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        Sharing...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <svg
+                                                            className="w-4 h-4"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                                                            />
+                                                        </svg>
+                                                        Share
+                                                    </>
                                                 )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Daily Bonus Claim Card */}
-                        {dailyBonusAvailable && !dailyBonusClaimed && (
-                            <div className="mx-6 mt-4 mb-2">
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4"
-                                >
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center">
-                                                <span className="text-xl">🎁</span>
-                                            </div>
-                                            <div>
-                                                <p className="text-white font-medium text-sm">Daily Bonus Available!</p>
-                                                <p className="text-amber-400/70 text-xs">+3 points for logging in today</p>
-                                            </div>
-                                        </div>
+                                            </button>
+                                        )}
                                         <button
-                                            onClick={handleClaimDailyBonus}
-                                            disabled={isClaimingBonus}
-                                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:shadow-lg hover:shadow-orange-500/25 transition-all disabled:opacity-50 flex items-center gap-2"
+                                            onClick={() =>
+                                                setIsAddFriendOpen(true)
+                                            }
+                                            disabled={!isSupabaseConfigured}
+                                            className="py-2 px-3 rounded-lg bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#FB8D22]/25 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {isClaimingBonus ? (
-                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            ) : (
-                                                <>
-                                                    <span>✨</span>
-                                                    Claim
-                                                </>
-                                            )}
+                                            <svg
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M12 4v16m8-8H4"
+                                                />
+                                            </svg>
+                                            Add Friend
                                         </button>
                                     </div>
-                                </motion.div>
+                                </div>
                             </div>
-                        )}
 
-                        <div className="p-6">
-                            <FriendsList
-                                friends={friendsListData}
-                                userAddress={userAddress}
-                                onCall={handleCall}
-                                onVideoCall={handleVideoCall}
-                                onChat={isPasskeyUser ? undefined : handleChat}
-                                onRemove={handleRemoveFriend}
-                                onUpdateNote={updateNickname}
-                                isCallActive={callState !== "idle"}
-                                unreadCounts={
-                                    isPasskeyUser
-                                        ? {}
-                                        : unreadCounts
-                                }
-                                hideChat={isPasskeyUser}
-                                friendsWakuStatus={friendsWakuStatus}
-                            />
+                            {/* Contacts List - shown after syncing */}
+                            {showContactsList && contacts.length > 0 && (
+                                <div className="px-6 pt-4 pb-2 border-b border-zinc-800">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="text-sm font-semibold text-white">
+                                            Contacts ({contacts.length})
+                                        </h3>
+                                        <button
+                                            onClick={() =>
+                                                setShowContactsList(false)
+                                            }
+                                            className="text-zinc-500 hover:text-white text-sm"
+                                        >
+                                            Hide
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {contacts.map((contact, idx) => {
+                                            const firstInvite = invites.find(
+                                                (inv) => !inv.used_by
+                                            );
+
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className="flex items-center justify-between p-2 bg-zinc-800/50 rounded-lg"
+                                                >
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-white text-sm font-medium truncate">
+                                                            {contact.name ||
+                                                                "Unknown"}
+                                                        </p>
+                                                        {contact.phone && (
+                                                            <p className="text-zinc-400 text-xs truncate">
+                                                                {contact.phone}
+                                                            </p>
+                                                        )}
+                                                        {contact.email && (
+                                                            <p className="text-zinc-400 text-xs truncate">
+                                                                {contact.email}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    {firstInvite && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                await shareInvite(
+                                                                    firstInvite.code
+                                                                );
+                                                            }}
+                                                            className="ml-2 px-3 py-1.5 bg-[#FF5500] hover:bg-[#E04D00] text-white text-xs rounded-lg transition-colors whitespace-nowrap"
+                                                        >
+                                                            Send Invite
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Daily Bonus Claim Card */}
+                            {dailyBonusAvailable && !dailyBonusClaimed && (
+                                <div className="mx-6 mt-4 mb-2">
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4"
+                                    >
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center">
+                                                    <span className="text-xl">
+                                                        🎁
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-white font-medium text-sm">
+                                                        Daily Bonus Available!
+                                                    </p>
+                                                    <p className="text-amber-400/70 text-xs">
+                                                        +3 points for logging in
+                                                        today
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={handleClaimDailyBonus}
+                                                disabled={isClaimingBonus}
+                                                className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:shadow-lg hover:shadow-orange-500/25 transition-all disabled:opacity-50 flex items-center gap-2"
+                                            >
+                                                {isClaimingBonus ? (
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        <span>✨</span>
+                                                        Claim
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                </div>
+                            )}
+
+                            <div className="p-6">
+                                <FriendsList
+                                    friends={friendsListData}
+                                    userAddress={userAddress}
+                                    onCall={handleCall}
+                                    onVideoCall={handleVideoCall}
+                                    onChat={
+                                        isPasskeyUser ? undefined : handleChat
+                                    }
+                                    onRemove={handleRemoveFriend}
+                                    onUpdateNote={updateNickname}
+                                    isCallActive={callState !== "idle"}
+                                    unreadCounts={
+                                        isPasskeyUser ? {} : unreadCounts
+                                    }
+                                    hideChat={isPasskeyUser}
+                                    friendsWakuStatus={friendsWakuStatus}
+                                />
+                            </div>
                         </div>
-                    </div>
                     )}
 
                     {/* Chats Section - Shows FriendsList in chat mode plus Group Chats */}
                     {activeNavTab === "chats" && (
-                    <>
-                    {/* Live Now Section */}
-                    {liveStreams.length > 0 && (
-                        <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border border-red-500/30 rounded-2xl overflow-hidden mb-6">
-                            <div className="p-4 border-b border-red-500/20">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                                    <h2 className="text-lg font-bold text-white">
-                                        Live Now
-                                    </h2>
-                                    <span className="text-zinc-400 text-sm">
-                                        {liveStreams.length} streaming
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="p-4">
-                                <div className="flex gap-3 overflow-x-auto pb-2">
-                                    {liveStreams.map((stream) => {
-                                        const streamerInfo = getAlphaUserInfo(stream.user_address);
-                                        return (
-                                            <a
-                                                key={stream.id}
-                                                href={`/live/${stream.id}`}
-                                                className="flex-shrink-0 group"
-                                            >
-                                                <div className="relative">
-                                                    {streamerInfo?.avatar ? (
-                                                        <img
-                                                            src={streamerInfo.avatar}
-                                                            alt=""
-                                                            className="w-14 h-14 rounded-full object-cover ring-2 ring-red-500 group-hover:ring-4 transition-all"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white font-bold text-lg ring-2 ring-red-500 group-hover:ring-4 transition-all">
-                                                            {(streamerInfo?.name || stream.user_address).slice(0, 2).toUpperCase()}
+                        <>
+                            {/* Live Now Section */}
+                            {liveStreams.length > 0 && (
+                                <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border border-red-500/30 rounded-2xl overflow-hidden mb-6">
+                                    <div className="p-4 border-b border-red-500/20">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                            <h2 className="text-lg font-bold text-white">
+                                                Live Now
+                                            </h2>
+                                            <span className="text-zinc-400 text-sm">
+                                                {liveStreams.length} streaming
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="p-4">
+                                        <div className="flex gap-3 overflow-x-auto pb-2">
+                                            {liveStreams.map((stream) => {
+                                                const streamerInfo =
+                                                    getAlphaUserInfo(
+                                                        stream.user_address
+                                                    );
+                                                return (
+                                                    <a
+                                                        key={stream.id}
+                                                        href={`/live/${stream.id}`}
+                                                        className="flex-shrink-0 group"
+                                                    >
+                                                        <div className="relative">
+                                                            {streamerInfo?.avatar ? (
+                                                                <img
+                                                                    src={
+                                                                        streamerInfo.avatar
+                                                                    }
+                                                                    alt=""
+                                                                    className="w-14 h-14 rounded-full object-cover ring-2 ring-red-500 group-hover:ring-4 transition-all"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center text-white font-bold text-lg ring-2 ring-red-500 group-hover:ring-4 transition-all">
+                                                                    {(
+                                                                        streamerInfo?.name ||
+                                                                        stream.user_address
+                                                                    )
+                                                                        .slice(
+                                                                            0,
+                                                                            2
+                                                                        )
+                                                                        .toUpperCase()}
+                                                                </div>
+                                                            )}
+                                                            <LiveBadge />
                                                         </div>
-                                                    )}
-                                                    <LiveBadge />
-                                                </div>
-                                                <p className="text-xs text-zinc-300 mt-1 text-center truncate w-14">
-                                                    {streamerInfo?.name || `${stream.user_address.slice(0, 6)}...`}
-                                                </p>
-                                            </a>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Direct Messages (Chats) - Show first */}
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
-                        <div className="p-6 border-b border-zinc-800">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-xl font-bold text-white">
-                                        Chats
-                                    </h2>
-                                    <p className="text-zinc-500 text-sm mt-1">
-                                        {friendsListData.length} conversations
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6">
-                            <FriendsList
-                                friends={friendsListData}
-                                userAddress={userAddress}
-                                onCall={handleCall}
-                                onVideoCall={handleVideoCall}
-                                onChat={isPasskeyUser ? undefined : handleChat}
-                                onRemove={handleRemoveFriend}
-                                onUpdateNote={updateNickname}
-                                isCallActive={callState !== "idle"}
-                                unreadCounts={
-                                    isPasskeyUser
-                                        ? {}
-                                        : unreadCounts
-                                }
-                                hideChat={isPasskeyUser}
-                                friendsWakuStatus={friendsWakuStatus}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Group Chats Section */}
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
-                        <div className="p-6 border-b border-zinc-800">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-xl font-bold text-white">
-                                        Group Chats
-                                    </h2>
-                                    <p className="text-zinc-500 text-sm mt-1">
-                                        {groups.length + joinedChannels.length + 1} total
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setIsBrowseChannelsOpen(true)}
-                                        className="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-medium transition-all flex items-center gap-2"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                        </svg>
-                                        <span className="hidden sm:inline">Browse</span>
-                                    </button>
-                                    {isWakuInitialized && !isPasskeyUser && (
-                                        <button
-                                            onClick={() => setIsCreateGroupOpen(true)}
-                                            disabled={friends.length === 0}
-                                            className="py-2 px-3 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF7700] text-white font-medium transition-all hover:shadow-lg hover:shadow-orange-500/25 flex items-center gap-2 disabled:opacity-50"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                            </svg>
-                                            <span className="hidden sm:inline">New</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-4 space-y-2">
-                            {/* Spritz Global Chat - always show first */}
-                            <motion.button
-                                onClick={() => setIsAlphaChatOpen(true)}
-                                className={`w-full rounded-xl p-3 transition-all text-left ${
-                                    isAlphaMember 
-                                        ? "bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50" 
-                                        : "bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 hover:border-orange-500/50"
-                                }`}
-                                whileTap={{ scale: 0.99 }}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="relative flex-shrink-0">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-                                            <span className="text-lg">🍊</span>
+                                                        <p className="text-xs text-zinc-300 mt-1 text-center truncate w-14">
+                                                            {streamerInfo?.name ||
+                                                                `${stream.user_address.slice(
+                                                                    0,
+                                                                    6
+                                                                )}...`}
+                                                        </p>
+                                                    </a>
+                                                );
+                                            })}
                                         </div>
-                                        {isAlphaMember && alphaUnreadCount > 0 && (
-                                            <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full flex items-center justify-center">
-                                                <span className="text-white text-[10px] font-bold">
-                                                    {alphaUnreadCount > 9 ? "9+" : alphaUnreadCount}
-                                                </span>
-                                            </div>
-                                        )}
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-white font-medium truncate">Spritz Global</p>
-                                            <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] rounded">Official</span>
-                                        </div>
-                                        <p className="text-zinc-500 text-sm">
-                                            {isAlphaMember ? "Community chat" : "Tap to join"}
-                                        </p>
-                                    </div>
-                                    <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </div>
-                            </motion.button>
-
-                            {/* Public Channels */}
-                            {joinedChannels.map((channel) => (
-                                <button
-                                    key={channel.id}
-                                    onClick={() => setSelectedChannel(channel)}
-                                    className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors text-left"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center text-xl">
-                                        {channel.emoji}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-white font-medium truncate">{channel.name}</p>
-                                            {channel.is_official && (
-                                                <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] rounded">Official</span>
-                                            )}
-                                        </div>
-                                        <p className="text-zinc-500 text-sm truncate">{channel.member_count} members</p>
-                                    </div>
-                                    <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            ))}
-
-                            {/* Private Group Chats */}
-                            {isWakuInitialized && !isPasskeyUser && groups.map((group) => (
-                                <button
-                                    key={group.id}
-                                    onClick={() => setSelectedGroup(group)}
-                                    className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors text-left"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center text-xl">
-                                        {group.emoji || "👥"}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-white font-medium truncate">{group.name}</p>
-                                            <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] rounded">Private</span>
-                                        </div>
-                                        <p className="text-zinc-500 text-sm truncate">
-                                            {group.memberCount || 0} members
-                                        </p>
-                                    </div>
-                                    <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            ))}
-
-                            {/* Empty state for channels */}
-                            {joinedChannels.length === 0 && groups.length === 0 && (
-                                <div className="text-center py-4">
-                                    <p className="text-zinc-500 text-sm">
-                                        <button
-                                            onClick={() => setIsBrowseChannelsOpen(true)}
-                                            className="text-[#FF5500] hover:underline"
-                                        >
-                                            Browse channels
-                                        </button>
-                                        {" "}to find communities to join
-                                    </p>
                                 </div>
                             )}
-                        </div>
-                    </div>
 
-                    {/* Group Invitations Section */}
-                    {isWakuInitialized &&
-                        !isPasskeyUser &&
-                        pendingInvitations.length > 0 && (
-                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6 p-6">
-                                <GroupInvitations
-                                    invitations={pendingInvitations}
-                                    onAccept={acceptInvitation}
-                                    onDecline={async (
-                                        invitationId: string,
-                                        groupId: string
-                                    ) => {
-                                        // First leave/hide the Waku group
-                                        await leaveGroup(groupId);
-                                        // Then mark the invitation as declined
-                                        const result = await declineInvitation(
-                                            invitationId
-                                        );
-                                        // Refresh groups list
-                                        const fetchedGroups = await getGroups();
-                                        setGroups(fetchedGroups);
-                                        return result;
-                                    }}
-                                    onJoinGroup={handleJoinGroupFromInvite}
-                                />
+                            {/* Direct Messages (Chats) - Show first */}
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
+                                <div className="p-6 border-b border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white">
+                                                Chats
+                                            </h2>
+                                            <p className="text-zinc-500 text-sm mt-1">
+                                                {friendsListData.length}{" "}
+                                                conversations
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-6">
+                                    <FriendsList
+                                        friends={friendsListData}
+                                        userAddress={userAddress}
+                                        onCall={handleCall}
+                                        onVideoCall={handleVideoCall}
+                                        onChat={
+                                            isPasskeyUser
+                                                ? undefined
+                                                : handleChat
+                                        }
+                                        onRemove={handleRemoveFriend}
+                                        onUpdateNote={updateNickname}
+                                        isCallActive={callState !== "idle"}
+                                        unreadCounts={
+                                            isPasskeyUser ? {} : unreadCounts
+                                        }
+                                        hideChat={isPasskeyUser}
+                                        friendsWakuStatus={friendsWakuStatus}
+                                    />
+                                </div>
                             </div>
-                        )}
-                    </>
+
+                            {/* Group Chats Section */}
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
+                                <div className="p-6 border-b border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white">
+                                                Group Chats
+                                            </h2>
+                                            <p className="text-zinc-500 text-sm mt-1">
+                                                {groups.length +
+                                                    joinedChannels.length +
+                                                    1}{" "}
+                                                total
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() =>
+                                                    setIsBrowseChannelsOpen(
+                                                        true
+                                                    )
+                                                }
+                                                className="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-medium transition-all flex items-center gap-2"
+                                            >
+                                                <svg
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                                    />
+                                                </svg>
+                                                <span className="hidden sm:inline">
+                                                    Browse
+                                                </span>
+                                            </button>
+                                            {isWakuInitialized &&
+                                                !isPasskeyUser && (
+                                                    <button
+                                                        onClick={() =>
+                                                            setIsCreateGroupOpen(
+                                                                true
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            friends.length === 0
+                                                        }
+                                                        className="py-2 px-3 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF7700] text-white font-medium transition-all hover:shadow-lg hover:shadow-orange-500/25 flex items-center gap-2 disabled:opacity-50"
+                                                    >
+                                                        <svg
+                                                            className="w-4 h-4"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M12 4v16m8-8H4"
+                                                            />
+                                                        </svg>
+                                                        <span className="hidden sm:inline">
+                                                            New
+                                                        </span>
+                                                    </button>
+                                                )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    {/* Spritz Global Chat - always show first */}
+                                    <motion.button
+                                        onClick={() => setIsAlphaChatOpen(true)}
+                                        className={`w-full rounded-xl p-3 transition-all text-left ${
+                                            isAlphaMember
+                                                ? "bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50"
+                                                : "bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 hover:border-orange-500/50"
+                                        }`}
+                                        whileTap={{ scale: 0.99 }}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative flex-shrink-0">
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                                                    <span className="text-lg">
+                                                        🍊
+                                                    </span>
+                                                </div>
+                                                {isAlphaMember &&
+                                                    alphaUnreadCount > 0 && (
+                                                        <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full flex items-center justify-center">
+                                                            <span className="text-white text-[10px] font-bold">
+                                                                {alphaUnreadCount >
+                                                                9
+                                                                    ? "9+"
+                                                                    : alphaUnreadCount}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-white font-medium truncate">
+                                                        Spritz Global
+                                                    </p>
+                                                    <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] rounded">
+                                                        Official
+                                                    </span>
+                                                </div>
+                                                <p className="text-zinc-500 text-sm">
+                                                    {isAlphaMember
+                                                        ? "Community chat"
+                                                        : "Tap to join"}
+                                                </p>
+                                            </div>
+                                            <svg
+                                                className="w-5 h-5 text-zinc-600"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M9 5l7 7-7 7"
+                                                />
+                                            </svg>
+                                        </div>
+                                    </motion.button>
+
+                                    {/* Public Channels */}
+                                    {joinedChannels.map((channel) => (
+                                        <button
+                                            key={channel.id}
+                                            onClick={() =>
+                                                setSelectedChannel(channel)
+                                            }
+                                            className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors text-left"
+                                        >
+                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center text-xl">
+                                                {channel.emoji}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-white font-medium truncate">
+                                                        {channel.name}
+                                                    </p>
+                                                    {channel.is_official && (
+                                                        <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] rounded">
+                                                            Official
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-zinc-500 text-sm truncate">
+                                                    {channel.member_count}{" "}
+                                                    members
+                                                </p>
+                                            </div>
+                                            <svg
+                                                className="w-5 h-5 text-zinc-600"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M9 5l7 7-7 7"
+                                                />
+                                            </svg>
+                                        </button>
+                                    ))}
+
+                                    {/* Private Group Chats */}
+                                    {isWakuInitialized &&
+                                        !isPasskeyUser &&
+                                        groups.map((group) => (
+                                            <button
+                                                key={group.id}
+                                                onClick={() =>
+                                                    setSelectedGroup(group)
+                                                }
+                                                className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors text-left"
+                                            >
+                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center text-xl">
+                                                    {group.emoji || "👥"}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-white font-medium truncate">
+                                                            {group.name}
+                                                        </p>
+                                                        <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] rounded">
+                                                            Private
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-zinc-500 text-sm truncate">
+                                                        {group.memberCount || 0}{" "}
+                                                        members
+                                                    </p>
+                                                </div>
+                                                <svg
+                                                    className="w-5 h-5 text-zinc-600"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M9 5l7 7-7 7"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        ))}
+
+                                    {/* Empty state for channels */}
+                                    {joinedChannels.length === 0 &&
+                                        groups.length === 0 && (
+                                            <div className="text-center py-4">
+                                                <p className="text-zinc-500 text-sm">
+                                                    <button
+                                                        onClick={() =>
+                                                            setIsBrowseChannelsOpen(
+                                                                true
+                                                            )
+                                                        }
+                                                        className="text-[#FF5500] hover:underline"
+                                                    >
+                                                        Browse channels
+                                                    </button>{" "}
+                                                    to find communities to join
+                                                </p>
+                                            </div>
+                                        )}
+                                </div>
+                            </div>
+
+                            {/* Group Invitations Section */}
+                            {isWakuInitialized &&
+                                !isPasskeyUser &&
+                                pendingInvitations.length > 0 && (
+                                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mt-6 p-6">
+                                        <GroupInvitations
+                                            invitations={pendingInvitations}
+                                            onAccept={acceptInvitation}
+                                            onDecline={async (
+                                                invitationId: string,
+                                                groupId: string
+                                            ) => {
+                                                // First leave/hide the Waku group
+                                                await leaveGroup(groupId);
+                                                // Then mark the invitation as declined
+                                                const result =
+                                                    await declineInvitation(
+                                                        invitationId
+                                                    );
+                                                // Refresh groups list
+                                                const fetchedGroups =
+                                                    await getGroups();
+                                                setGroups(fetchedGroups);
+                                                return result;
+                                            }}
+                                            onJoinGroup={
+                                                handleJoinGroupFromInvite
+                                            }
+                                        />
+                                    </div>
+                                )}
+                        </>
                     )}
 
                     {/* Calls Section */}
                     {activeNavTab === "calls" && (
-                    <div className="space-y-4">
-                        {/* Rooms Section - New Instant and New Scheduled */}
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
-                            <div className="p-6">
-                                <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                    <span>🚪</span>
-                                    Rooms
-                                </h2>
-                                <div className="flex flex-wrap gap-3">
-                                    {/* New Instant Room */}
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                const res = await fetch("/api/rooms", {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({
-                                                        hostWalletAddress: userAddress,
-                                                        title: "Quick Meeting",
-                                                    }),
-                                                });
-                                                const data = await res.json();
-                                                if (res.ok && data.room) {
-                                                    // Track room creation
-                                                    trackRoomCreated();
-                                                    // Copy link to clipboard
-                                                    navigator.clipboard.writeText(data.room.joinUrl);
-                                                    // Check if running as PWA
-                                                    const isStandalone =
-                                                        window.matchMedia("(display-mode: standalone)").matches ||
-                                                        // @ts-expect-error - iOS Safari specific
-                                                        window.navigator.standalone === true;
-                                                    // Open the room - same page for PWA, new tab for desktop
-                                                    if (isStandalone) {
-                                                        window.location.href = data.room.joinUrl;
-                                                    } else {
-                                                        window.open(data.room.joinUrl, "_blank");
-                                                    }
-                                                } else {
-                                                    alert(data.error || "Failed to create room");
-                                                }
-                                            } catch {
-                                                alert("Failed to create room");
-                                            }
-                                        }}
-                                        className="flex-1 min-w-[140px] py-3 px-5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        New Instant
-                                    </button>
-
-                                    {/* New Scheduled */}
-                                    <button
-                                        onClick={() => setShowNewScheduledModal(true)}
-                                        className="flex-1 min-w-[140px] py-3 px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium hover:shadow-lg hover:shadow-orange-500/25 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        New Scheduled
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* New Call Actions - Top Section */}
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
-                            <div className="p-6">
-                                <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                    <span>📞</span>
-                                    Start a Call
-                                </h2>
-                                <div className="flex flex-wrap gap-3">
-                                    {/* New Call */}
-                                    <button
-                                        onClick={() => setShowNewCallModal(true)}
-                                        disabled={callState !== "idle" || friendsListData.length === 0}
-                                        className="flex-1 min-w-[140px] py-3 px-5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        New Call
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Permanent Room Card */}
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
-                            <div className="p-6">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                                            <span>🔗</span>
-                                            Your Permanent Meeting Room
-                                        </h2>
-                                        <p className="text-zinc-500 text-sm mt-1">
-                                            Share this link for instant meetings - it never expires
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                    <input
-                                        type="text"
-                                        value={`https://app.spritz.chat/room/${userAddress}`}
-                                        readOnly
-                                        className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm font-mono"
-                                    />
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (!userAddress) return;
-                                                const link = `${window.location.origin}/room/${userAddress.toLowerCase()}`;
-                                                navigator.clipboard.writeText(link);
-                                                const btn = document.querySelector('[data-room-copy-btn]') as HTMLElement;
-                                                if (btn) {
-                                                    const original = btn.textContent;
-                                                    btn.textContent = "Copied!";
-                                                    setTimeout(() => {
-                                                        btn.textContent = original || "Copy Link";
-                                                    }, 2000);
-                                                }
-                                            }}
-                                            data-room-copy-btn
-                                            className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap"
-                                        >
-                                            Copy Link
-                                        </button>
+                        <div className="space-y-4">
+                            {/* Rooms Section - New Instant and New Scheduled */}
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                                <div className="p-6">
+                                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                        <span>🚪</span>
+                                        Rooms
+                                    </h2>
+                                    <div className="flex flex-wrap gap-3">
+                                        {/* New Instant Room */}
                                         <button
                                             onClick={async () => {
                                                 try {
-                                                    // Ensure permanent room exists
-                                                    const res = await fetch(`/api/rooms/permanent?wallet_address=${userAddress}`);
-                                                    if (res.ok) {
-                                                        // Use window.location.origin instead of hardcoded URL
-                                                        const roomUrl = `${window.location.origin}/room/${userAddress}`;
-                                                        window.location.href = roomUrl; // Use same-page navigation instead of new tab
+                                                    const res = await fetch(
+                                                        "/api/rooms",
+                                                        {
+                                                            method: "POST",
+                                                            headers: {
+                                                                "Content-Type":
+                                                                    "application/json",
+                                                            },
+                                                            body: JSON.stringify(
+                                                                {
+                                                                    hostWalletAddress:
+                                                                        userAddress,
+                                                                    title: "Quick Meeting",
+                                                                }
+                                                            ),
+                                                        }
+                                                    );
+                                                    const data =
+                                                        await res.json();
+                                                    if (res.ok && data.room) {
+                                                        // Track room creation
+                                                        trackRoomCreated();
+                                                        // Copy link to clipboard
+                                                        navigator.clipboard.writeText(
+                                                            data.room.joinUrl
+                                                        );
+                                                        // Check if running as PWA
+                                                        const isStandalone =
+                                                            window.matchMedia(
+                                                                "(display-mode: standalone)"
+                                                            ).matches ||
+                                                            (
+                                                                window.navigator as any
+                                                            ).standalone ===
+                                                                true;
+                                                        // Open the room - same page for PWA, new tab for desktop
+                                                        if (isStandalone) {
+                                                            window.location.href =
+                                                                data.room.joinUrl;
+                                                        } else {
+                                                            window.open(
+                                                                data.room
+                                                                    .joinUrl,
+                                                                "_blank"
+                                                            );
+                                                        }
                                                     } else {
-                                                        alert("Failed to open room");
+                                                        alert(
+                                                            data.error ||
+                                                                "Failed to create room"
+                                                        );
                                                     }
-                                                } catch (err) {
-                                                    console.error("Failed to open room:", err);
-                                                    alert("Failed to open room");
+                                                } catch {
+                                                    alert(
+                                                        "Failed to create room"
+                                                    );
                                                 }
                                             }}
-                                            className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white text-sm rounded-lg transition-all whitespace-nowrap"
+                                            className="flex-1 min-w-[140px] py-3 px-5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all flex items-center justify-center gap-2"
                                         >
-                                            Open Room
+                                            <svg
+                                                className="w-5 h-5"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M12 4v16m8-8H4"
+                                                />
+                                            </svg>
+                                            New Instant
+                                        </button>
+
+                                        {/* New Scheduled */}
+                                        <button
+                                            onClick={() =>
+                                                setShowNewScheduledModal(true)
+                                            }
+                                            className="flex-1 min-w-[140px] py-3 px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium hover:shadow-lg hover:shadow-orange-500/25 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <svg
+                                                className="w-5 h-5"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M12 4v16m8-8H4"
+                                                />
+                                            </svg>
+                                            New Scheduled
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Scheduled Calls Card */}
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
-                            <div className="p-6 border-b border-zinc-800">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                            📅 Scheduled Calls
-                                        </h2>
-                                        <p className="text-zinc-500 text-sm mt-1">
-                                            Your upcoming and past scheduled meetings
-                                        </p>
+                            {/* New Call Actions - Top Section */}
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                                <div className="p-6">
+                                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                        <span>📞</span>
+                                        Start a Call
+                                    </h2>
+                                    <div className="flex flex-wrap gap-3">
+                                        {/* New Call */}
+                                        <button
+                                            onClick={() =>
+                                                setShowNewCallModal(true)
+                                            }
+                                            disabled={
+                                                callState !== "idle" ||
+                                                friendsListData.length === 0
+                                            }
+                                            className="flex-1 min-w-[140px] py-3 px-5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        >
+                                            <svg
+                                                className="w-5 h-5"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M12 4v16m8-8H4"
+                                                />
+                                            </svg>
+                                            New Call
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                            <div className="p-6">
-                                <ScheduledCalls userAddress={userAddress} />
-                            </div>
-                        </div>
 
-                        {/* Call History Card */}
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
-                            <div className="p-6 border-b border-zinc-800">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                            📞 Call History
-                                        </h2>
-                                        <p className="text-zinc-500 text-sm mt-1">
-                                            Voice and video calls with friends
-                                        </p>
+                            {/* Permanent Room Card */}
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                                <div className="p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div>
+                                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                                                <span>🔗</span>
+                                                Your Permanent Meeting Room
+                                            </h2>
+                                            <p className="text-zinc-500 text-sm mt-1">
+                                                Share this link for instant
+                                                meetings - it never expires
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={`https://app.spritz.chat/room/${userAddress}`}
+                                            readOnly
+                                            className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm font-mono"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!userAddress) return;
+                                                    const link = `${
+                                                        window.location.origin
+                                                    }/room/${userAddress.toLowerCase()}`;
+                                                    navigator.clipboard.writeText(
+                                                        link
+                                                    );
+                                                    const btn =
+                                                        document.querySelector(
+                                                            "[data-room-copy-btn]"
+                                                        ) as HTMLElement;
+                                                    if (btn) {
+                                                        const original =
+                                                            btn.textContent;
+                                                        btn.textContent =
+                                                            "Copied!";
+                                                        setTimeout(() => {
+                                                            btn.textContent =
+                                                                original ||
+                                                                "Copy Link";
+                                                        }, 2000);
+                                                    }
+                                                }}
+                                                data-room-copy-btn
+                                                className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap"
+                                            >
+                                                Copy Link
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        // Ensure permanent room exists
+                                                        const res = await fetch(
+                                                            `/api/rooms/permanent?wallet_address=${userAddress}`
+                                                        );
+                                                        if (res.ok) {
+                                                            // Use window.location.origin instead of hardcoded URL
+                                                            const roomUrl = `${window.location.origin}/room/${userAddress}`;
+                                                            window.location.href =
+                                                                roomUrl; // Use same-page navigation instead of new tab
+                                                        } else {
+                                                            alert(
+                                                                "Failed to open room"
+                                                            );
+                                                        }
+                                                    } catch (err) {
+                                                        console.error(
+                                                            "Failed to open room:",
+                                                            err
+                                                        );
+                                                        alert(
+                                                            "Failed to open room"
+                                                        );
+                                                    }
+                                                }}
+                                                className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white text-sm rounded-lg transition-all whitespace-nowrap"
+                                            >
+                                                Open Room
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="p-6">
-                                <CallHistory
-                                    userAddress={userAddress}
-                                    friends={friendsListData}
-                                    calls={callHistory}
-                                    isLoading={isCallHistoryLoading}
-                                    error={callHistoryError}
-                                    onRefresh={fetchCallHistory}
-                                    onCall={handleCall}
-                                    isCallActive={callState !== "idle"}
-                                />
+
+                            {/* Scheduled Calls Card */}
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                                <div className="p-6 border-b border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                                📅 Scheduled Calls
+                                            </h2>
+                                            <p className="text-zinc-500 text-sm mt-1">
+                                                Your upcoming and past scheduled
+                                                meetings
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-6">
+                                    <ScheduledCalls userAddress={userAddress} />
+                                </div>
+                            </div>
+
+                            {/* Call History Card */}
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                                <div className="p-6 border-b border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                                📞 Call History
+                                            </h2>
+                                            <p className="text-zinc-500 text-sm mt-1">
+                                                Voice and video calls with
+                                                friends
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-6">
+                                    <CallHistory
+                                        userAddress={userAddress}
+                                        friends={friendsListData}
+                                        calls={callHistory}
+                                        isLoading={isCallHistoryLoading}
+                                        error={callHistoryError}
+                                        onRefresh={fetchCallHistory}
+                                        onCall={handleCall}
+                                        isCallActive={callState !== "idle"}
+                                    />
+                                </div>
                             </div>
                         </div>
-                    </div>
                     )}
 
                     {/* Leaderboard Section */}
                     {activeNavTab === "leaderboard" && (
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
-                        <Leaderboard userAddress={userAddress} limit={50} />
-                    </div>
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+                            <Leaderboard userAddress={userAddress} limit={50} />
+                        </div>
                     )}
 
                     {/* Call Error */}
@@ -3563,7 +3896,9 @@ function DashboardContent({
                                 }`}
                             >
                                 <span className="text-lg">✨</span>
-                                <span className="text-[10px] font-medium">Agents</span>
+                                <span className="text-[10px] font-medium">
+                                    Agents
+                                </span>
                             </button>
 
                             {/* Friends Tab */}
@@ -3576,7 +3911,9 @@ function DashboardContent({
                                 }`}
                             >
                                 <span className="text-lg">👥</span>
-                                <span className="text-[10px] font-medium">Friends</span>
+                                <span className="text-[10px] font-medium">
+                                    Friends
+                                </span>
                             </button>
 
                             {/* Chats Tab */}
@@ -3589,11 +3926,16 @@ function DashboardContent({
                                 }`}
                             >
                                 <span className="text-lg">💬</span>
-                                <span className="text-[10px] font-medium">Chats</span>
+                                <span className="text-[10px] font-medium">
+                                    Chats
+                                </span>
                                 {/* Unread indicator */}
-                                {unreadCounts && Object.values(unreadCounts).some(c => c > 0) && (
-                                    <span className="absolute top-0.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                                )}
+                                {unreadCounts &&
+                                    Object.values(unreadCounts).some(
+                                        (c) => c > 0
+                                    ) && (
+                                        <span className="absolute top-0.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                                    )}
                             </button>
 
                             {/* Calls Tab */}
@@ -3606,7 +3948,9 @@ function DashboardContent({
                                 }`}
                             >
                                 <span className="text-lg">📞</span>
-                                <span className="text-[10px] font-medium">Calls</span>
+                                <span className="text-[10px] font-medium">
+                                    Calls
+                                </span>
                             </button>
 
                             {/* Bug Report Tab */}
@@ -3621,7 +3965,9 @@ function DashboardContent({
                                 }`}
                             >
                                 <span className="text-lg">🐛</span>
-                                <span className="text-[10px] font-medium">Report</span>
+                                <span className="text-[10px] font-medium">
+                                    Report
+                                </span>
                             </button>
 
                             {/* Settings Tab - just opens modal, doesn't change active tab */}
@@ -3634,7 +3980,9 @@ function DashboardContent({
                                 }`}
                             >
                                 <span className="text-lg">⚙️</span>
-                                <span className="text-[10px] font-medium">Settings</span>
+                                <span className="text-[10px] font-medium">
+                                    Settings
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -3647,7 +3995,10 @@ function DashboardContent({
                 <footer className="border-t border-zinc-800 bg-zinc-900/50 py-4 px-4 mt-auto">
                     <div className="max-w-4xl mx-auto">
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-zinc-500">
-                            <p>© {new Date().getFullYear()} Spritz. All rights reserved.</p>
+                            <p>
+                                © {new Date().getFullYear()} Spritz. All rights
+                                reserved.
+                            </p>
                             <div className="flex items-center gap-4">
                                 <Link
                                     href="/privacy"
@@ -3678,6 +4029,13 @@ function DashboardContent({
                 onAdd={handleSendFriendRequest}
                 isLoading={isFriendsLoading}
                 error={friendsError}
+                initialValue={
+                    typeof window !== "undefined"
+                        ? new URLSearchParams(window.location.search).get(
+                              "add"
+                          ) || undefined
+                        : undefined
+                }
             />
 
             {/* Voice Call UI */}
@@ -3871,13 +4229,27 @@ function DashboardContent({
                             >
                                 <div className="p-6 border-b border-zinc-800">
                                     <div className="flex items-center justify-between">
-                                        <h2 className="text-xl font-bold text-white">Call a Friend</h2>
+                                        <h2 className="text-xl font-bold text-white">
+                                            Call a Friend
+                                        </h2>
                                         <button
-                                            onClick={() => setShowNewCallModal(false)}
+                                            onClick={() =>
+                                                setShowNewCallModal(false)
+                                            }
                                             className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
                                         >
-                                            <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            <svg
+                                                className="w-5 h-5 text-zinc-400"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M6 18L18 6M6 6l12 12"
+                                                />
                                             </svg>
                                         </button>
                                     </div>
@@ -3885,8 +4257,12 @@ function DashboardContent({
                                 <div className="p-4 max-h-96 overflow-y-auto">
                                     {friendsListData.length === 0 ? (
                                         <div className="text-center py-8">
-                                            <p className="text-zinc-400">No friends to call</p>
-                                            <p className="text-zinc-500 text-sm mt-2">Add friends to start calling</p>
+                                            <p className="text-zinc-400">
+                                                No friends to call
+                                            </p>
+                                            <p className="text-zinc-500 text-sm mt-2">
+                                                Add friends to start calling
+                                            </p>
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
@@ -3894,31 +4270,72 @@ function DashboardContent({
                                                 <button
                                                     key={friend.id}
                                                     onClick={() => {
-                                                        setShowNewCallModal(false);
-                                                        handleCall(friend, false);
+                                                        setShowNewCallModal(
+                                                            false
+                                                        );
+                                                        handleCall(
+                                                            friend,
+                                                            false
+                                                        );
                                                     }}
-                                                    disabled={callState !== "idle"}
+                                                    disabled={
+                                                        callState !== "idle"
+                                                    }
                                                     className="w-full flex items-center gap-3 p-3 hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
                                                 >
                                                     {friend.avatar ? (
-                                                        <img src={friend.avatar} alt="" className="w-10 h-10 rounded-full" />
+                                                        <img
+                                                            src={friend.avatar}
+                                                            alt=""
+                                                            className="w-10 h-10 rounded-full"
+                                                        />
                                                     ) : (
                                                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-sm text-white">
-                                                            {(friend.nickname || friend.reachUsername || friend.ensName || friend.address)?.[0]?.toUpperCase() || "?"}
+                                                            {(friend.nickname ||
+                                                                friend.reachUsername ||
+                                                                friend.ensName ||
+                                                                friend.address)?.[0]?.toUpperCase() ||
+                                                                "?"}
                                                         </div>
                                                     )}
                                                     <div className="flex-1 text-left">
                                                         <p className="text-sm font-medium text-white">
-                                                            {friend.nickname || friend.reachUsername || friend.ensName || `${friend.address.slice(0, 6)}...${friend.address.slice(-4)}`}
+                                                            {friend.nickname ||
+                                                                friend.reachUsername ||
+                                                                friend.ensName ||
+                                                                `${friend.address.slice(
+                                                                    0,
+                                                                    6
+                                                                )}...${friend.address.slice(
+                                                                    -4
+                                                                )}`}
                                                         </p>
-                                                        {(friend.reachUsername || friend.ensName) && (
+                                                        {(friend.reachUsername ||
+                                                            friend.ensName) && (
                                                             <p className="text-xs text-zinc-500">
-                                                                {friend.address.slice(0, 6)}...{friend.address.slice(-4)}
+                                                                {friend.address.slice(
+                                                                    0,
+                                                                    6
+                                                                )}
+                                                                ...
+                                                                {friend.address.slice(
+                                                                    -4
+                                                                )}
                                                             </p>
                                                         )}
                                                     </div>
-                                                    <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                    <svg
+                                                        className="w-5 h-5 text-zinc-400"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                                        />
                                                     </svg>
                                                 </button>
                                             ))}
@@ -3976,8 +4393,12 @@ function DashboardContent({
                     }
                     return result;
                 }}
-                isFriend={(address) => 
-                    friends.some(f => f.friend_address.toLowerCase() === address.toLowerCase())
+                isFriend={(address) =>
+                    friends.some(
+                        (f) =>
+                            f.friend_address.toLowerCase() ===
+                            address.toLowerCase()
+                    )
                 }
             />
 
@@ -4041,8 +4462,12 @@ function DashboardContent({
                         const result = await sendFriendRequest(address);
                         return result;
                     }}
-                    isFriend={(address) => 
-                        friends.some(f => f.friend_address.toLowerCase() === address.toLowerCase())
+                    isFriend={(address) =>
+                        friends.some(
+                            (f) =>
+                                f.friend_address.toLowerCase() ===
+                                address.toLowerCase()
+                        )
                     }
                 />
             )}
@@ -4091,18 +4516,22 @@ function DashboardContent({
                             <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                transition={{ type: "spring", delay: 0.1, stiffness: 200 }}
+                                transition={{
+                                    type: "spring",
+                                    delay: 0.1,
+                                    stiffness: 200,
+                                }}
                                 className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center"
                             >
                                 <motion.span
-                                    animate={{ 
+                                    animate={{
                                         rotate: [0, -10, 10, -10, 0],
-                                        scale: [1, 1.1, 1]
+                                        scale: [1, 1.1, 1],
                                     }}
-                                    transition={{ 
-                                        duration: 0.5, 
-                                        repeat: Infinity, 
-                                        repeatDelay: 2 
+                                    transition={{
+                                        duration: 0.5,
+                                        repeat: Infinity,
+                                        repeatDelay: 2,
                                     }}
                                     className="text-4xl"
                                 >
@@ -4114,7 +4543,11 @@ function DashboardContent({
                                 Daily Bonus Available!
                             </h2>
                             <p className="text-zinc-400 mb-6">
-                                Claim your <span className="text-amber-400 font-semibold">+3 points</span> for logging in today
+                                Claim your{" "}
+                                <span className="text-amber-400 font-semibold">
+                                    +3 points
+                                </span>{" "}
+                                for logging in today
                             </p>
 
                             <button

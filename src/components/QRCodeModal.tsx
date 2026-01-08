@@ -41,13 +41,17 @@ export function QRCodeModal({
         ensName ||
         `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-    // Share URL - the add friend link
-    const shareUrl = `https://app.spritz.chat?add=${address}`;
+    // Share URL - use username if available, otherwise fall back to address
+    const shareUrl = reachUsername
+        ? `https://app.spritz.chat?add=${reachUsername}`
+        : `https://app.spritz.chat?add=${address}`;
 
     // The QR code contains the full app link with add parameter
     const qrValue = shareUrl;
-    const shareText = `🚀 Add me on Spritz - the censorship resistant chat app for Web3!\n\n${shareUrl}`;
-    const shareTextWithAddress = `🚀 Add me on Spritz - the censorship resistant chat app for Web3!\n\nMy wallet: ${address}\n\n${shareUrl}`;
+    const shareText = `🚀 Add me on Spritz - the censorship resistant chat app for Web3!`;
+    const shareTextWithAddress = reachUsername
+        ? `🚀 Add me on Spritz - the censorship resistant chat app for Web3!\n\nMy username: @${reachUsername}`
+        : `🚀 Add me on Spritz - the censorship resistant chat app for Web3!\n\nMy wallet: ${address}`;
 
     // Generate QR code as image blob
     const getQRImageBlob = useCallback(async (): Promise<Blob | null> => {
@@ -168,15 +172,15 @@ export function QRCodeModal({
     // Social share URLs
     const socialLinks = {
         twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-            shareText
+            `${shareText}\n\n${shareUrl}`
         )}`,
         telegram: `https://t.me/share/url?url=${encodeURIComponent(
             shareUrl
-        )}&text=${encodeURIComponent("🚀 Add me on Spritz - the censorship resistant chat app for Web3!")}`,
-        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareTextWithAddress)}`,
+        )}&text=${encodeURIComponent(shareText)}`,
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(`${shareTextWithAddress}\n\n${shareUrl}`)}`,
         facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
             shareUrl
-        )}&quote=${encodeURIComponent("🚀 Add me on Spritz - the censorship resistant chat app for Web3!")}`,
+        )}&quote=${encodeURIComponent(shareText)}`,
     };
 
     const canNativeShare =
@@ -258,10 +262,16 @@ export function QRCodeModal({
                                     <p className="text-white font-medium">
                                         {displayName}
                                     </p>
-                                    <p className="text-zinc-500 text-xs font-mono">
-                                        {address.slice(0, 10)}...
-                                        {address.slice(-8)}
-                                    </p>
+                                    {reachUsername ? (
+                                        <p className="text-zinc-500 text-xs">
+                                            @{reachUsername}
+                                        </p>
+                                    ) : (
+                                        <p className="text-zinc-500 text-xs font-mono">
+                                            {address.slice(0, 10)}...
+                                            {address.slice(-8)}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 

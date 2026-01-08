@@ -13,6 +13,7 @@ type AddFriendModalProps = {
     onAdd: (addressOrENS: string, nickname?: string) => Promise<boolean>;
     isLoading: boolean;
     error: string | null;
+    initialValue?: string;
 };
 
 // Check if input looks like a phone number
@@ -27,6 +28,7 @@ export function AddFriendModal({
     onAdd,
     isLoading,
     error,
+    initialValue,
 }: AddFriendModalProps) {
     const [input, setInput] = useState("");
     const [nickname, setNickname] = useState("");
@@ -37,6 +39,13 @@ export function AddFriendModal({
     const { resolveAddressOrENS, isResolving, error: resolveError } = useENS();
     const { lookupUsername } = useUsername(null);
     const { lookupByPhone } = usePhoneVerification(null);
+
+    // Set initial value when modal opens
+    useEffect(() => {
+        if (isOpen && initialValue) {
+            setInput(initialValue);
+        }
+    }, [isOpen, initialValue]);
 
     // Handle QR scan result - parse URL to extract address if needed
     const handleQRScan = (scannedValue: string) => {
