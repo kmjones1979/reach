@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
         const userAddress = searchParams.get("userAddress");
         const filter = searchParams.get("filter") || "all"; // all, public, friends
         const search = searchParams.get("search") || "";
-        const limit = parseInt(searchParams.get("limit") || "20");
+        // Increase limit when searching to ensure we can find all matching agents
+        const baseLimit = parseInt(searchParams.get("limit") || "20");
+        const limit = search ? Math.max(baseLimit, 100) : baseLimit;
 
         if (!userAddress) {
             return NextResponse.json({ error: "User address required" }, { status: 400 });
@@ -133,6 +135,7 @@ export async function GET(request: NextRequest) {
         // Filter by search term if provided (name, personality, and tags - case-insensitive partial match)
         if (search) {
             const searchLower = search.toLowerCase().trim();
+            
             enrichedAgents = enrichedAgents.filter(agent => {
                 // Check name match
                 const nameMatch = agent.name?.toLowerCase().includes(searchLower);
@@ -141,10 +144,30 @@ export async function GET(request: NextRequest) {
                 const personalityMatch = agent.personality?.toLowerCase().includes(searchLower);
                 
                 // Check if any tag contains the search term (case-insensitive partial match)
-                const tagMatch = agent.tags && Array.isArray(agent.tags) && 
-                    agent.tags.some((tag: string) => 
-                        tag.toLowerCase().includes(searchLower)
-                    );
+                // Handle tags as JSONB array - ensure it's an array
+                let tagMatch = false;
+                if (agent.tags) {
+                    try {
+                        // Handle both array and JSONB formats
+                        let tagsArray: string[] = [];
+                        if (Array.isArray(agent.tags)) {
+                            tagsArray = agent.tags;
+                        } else if (typeof agent.tags === 'string') {
+                            // Try to parse as JSON
+                            tagsArray = JSON.parse(agent.tags);
+                        }
+                        
+                        // Filter out null/undefined and ensure all are strings
+                        tagsArray = tagsArray.filter(tag => tag != null).map(tag => String(tag));
+                        
+                        tagMatch = tagsArray.some((tag: string) => {
+                            return tag.toLowerCase().includes(searchLower);
+                        });
+                    } catch (err) {
+                        // If parsing fails, skip tag matching for this agent
+                        console.warn("[Discover] Failed to parse tags for agent:", agent.id, err);
+                    }
+                }
                 
                 // Return true if any field matches
                 return nameMatch || personalityMatch || tagMatch;
