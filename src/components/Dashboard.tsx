@@ -2921,23 +2921,6 @@ function DashboardContent({
                         )}
                     </AnimatePresence>
 
-                    {/* Friend Requests Section */}
-                    {(incomingRequests.length > 0 ||
-                        outgoingRequests.length > 0) && (
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
-                            <div className="p-6">
-                                <FriendRequests
-                                    incomingRequests={incomingRequests}
-                                    outgoingRequests={outgoingRequests}
-                                    onAccept={handleAcceptRequest}
-                                    onReject={rejectRequest}
-                                    onCancel={cancelRequest}
-                                    isLoading={isFriendsLoading}
-                                />
-                            </div>
-                        </div>
-                    )}
-
                     {/* AI Agents Section - shown when Agents tab selected */}
                     {activeNavTab === "agents" && (
                         <div
@@ -2955,6 +2938,23 @@ function DashboardContent({
 
                     {/* Friends Section - shown when Friends tab selected */}
                     {activeNavTab === "friends" && (
+                        <>
+                        {/* Friend Requests Section - only on Friends tab */}
+                        {(incomingRequests.length > 0 ||
+                            outgoingRequests.length > 0) && (
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden mb-6">
+                                <div className="p-6">
+                                    <FriendRequests
+                                        incomingRequests={incomingRequests}
+                                        outgoingRequests={outgoingRequests}
+                                        onAccept={handleAcceptRequest}
+                                        onReject={rejectRequest}
+                                        onCancel={cancelRequest}
+                                        isLoading={isFriendsLoading}
+                                    />
+                                </div>
+                            </div>
+                        )}
                         <div
                             id="friends-section"
                             className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden"
@@ -3157,6 +3157,7 @@ function DashboardContent({
                                 />
                             </div>
                         </div>
+                        </>
                     )}
 
                     {/* Chats Section - Shows FriendsList in chat mode plus Group Chats */}

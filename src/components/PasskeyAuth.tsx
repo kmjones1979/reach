@@ -6,7 +6,6 @@ import { usePasskeyContext } from "@/context/PasskeyProvider";
 
 export function PasskeyAuth() {
     const [mode, setMode] = useState<"login" | "register">("login");
-    const [username, setUsername] = useState("");
     const {
         isLoading,
         isAuthenticated,
@@ -24,7 +23,8 @@ export function PasskeyAuth() {
         clearError();
 
         if (mode === "register") {
-            await register(username);
+            // Use a default name for the passkey credential
+            await register("Spritz Account");
         } else {
             await login();
         }
@@ -134,25 +134,6 @@ export function PasskeyAuth() {
                     </p>
                 )}
 
-                <AnimatePresence mode="wait">
-                    {mode === "register" && (
-                        <motion.div
-                            key="username-input"
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <input
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                placeholder="Enter your name"
-                                className="w-full py-3 px-4 bg-zinc-900/70 border border-zinc-800 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all"
-                            />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
 
                 <AnimatePresence>
                     {error && (
