@@ -6,6 +6,7 @@ import { type Address } from "viem";
 import { useXMTPContext } from "@/context/WakuProvider";
 import { PixelArtEditor } from "./PixelArtEditor";
 import { PixelArtImage } from "./PixelArtImage";
+import { PixelArtShare } from "./PixelArtShare";
 import { useReactions, REACTION_EMOJIS } from "@/hooks/useReactions";
 import { EmojiPicker, QuickReactionPicker } from "./EmojiPicker";
 import { LinkPreview, detectUrls } from "./LinkPreview";
@@ -69,6 +70,7 @@ export function ChatModal({
     const [showMsgReactions, setShowMsgReactions] = useState<string | null>(
         null
     );
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
 
@@ -797,8 +799,12 @@ export function ChatModal({
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-lg max-h-[65vh] h-[500px] z-50"
-                        style={{ marginBottom: '60px' }}
+                        className={`fixed z-50 ${
+                            isFullscreen 
+                                ? "inset-4 sm:inset-6" 
+                                : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-lg max-h-[65vh] h-[500px]"
+                        }`}
+                        style={isFullscreen ? {} : { marginBottom: '60px' }}
                     >
                         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col h-full overflow-hidden">
                             {/* Header */}
@@ -843,6 +849,22 @@ export function ChatModal({
                                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                                         />
                                     </svg>
+                                </button>
+                                {/* Fullscreen Toggle */}
+                                <button
+                                    onClick={() => setIsFullscreen(!isFullscreen)}
+                                    className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                                    title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                                >
+                                    {isFullscreen ? (
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                                        </svg>
+                                    )}
                                 </button>
                                 <button
                                     onClick={onClose}
@@ -1606,8 +1628,8 @@ export function ChatModal({
                                         className="!w-auto !h-auto max-w-[90vw] max-h-[80vh] min-w-[256px] min-h-[256px] shadow-2xl"
                                     />
 
-                                    {/* Download link */}
-                                    <div className="mt-4 flex justify-center">
+                                    {/* Action buttons */}
+                                    <div className="mt-4 flex justify-center gap-3">
                                         <a
                                             href={viewingImage}
                                             target="_blank"
@@ -1630,6 +1652,7 @@ export function ChatModal({
                                             </svg>
                                             Open Original
                                         </a>
+                                        <PixelArtShare imageUrl={viewingImage} />
                                     </div>
                                 </motion.div>
                             </motion.div>

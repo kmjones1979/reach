@@ -50,6 +50,7 @@ export function ChannelChatModal({
     const [addingFriend, setAddingFriend] = useState<string | null>(null);
     const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
     const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -212,14 +213,18 @@ export function ChannelChatModal({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 100px, 120px)' }}
+                style={isFullscreen ? {} : { paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 100px, 120px)' }}
                 onClick={onClose}
             >
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[70vh] h-[600px] flex flex-col overflow-hidden"
+                    className={`bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col overflow-hidden ${
+                        isFullscreen
+                            ? "w-full h-full max-w-none max-h-none"
+                            : "w-full max-w-2xl max-h-[70vh] h-[600px]"
+                    }`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
@@ -248,6 +253,22 @@ export function ChannelChatModal({
                                 className="px-3 py-1.5 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                             >
                                 Leave
+                            </button>
+                            {/* Fullscreen Toggle */}
+                            <button
+                                onClick={() => setIsFullscreen(!isFullscreen)}
+                                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
+                                title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                            >
+                                {isFullscreen ? (
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                                    </svg>
+                                ) : (
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                                    </svg>
+                                )}
                             </button>
                             <button
                                 onClick={onClose}

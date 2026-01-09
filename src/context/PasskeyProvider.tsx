@@ -22,6 +22,8 @@ import { type SafeSmartAccountImplementation } from "permissionless/accounts";
 const CREDENTIAL_STORAGE_KEY = "spritz_passkey_credential";
 const DEVICE_ID_STORAGE_KEY = "spritz_device_id";
 const DEVICE_ADDRESS_STORAGE_KEY = "spritz_passkey_address";
+const SESSION_STORAGE_KEY = "spritz_passkey_session";
+const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Get or create a unique device ID
 function getDeviceId(): string {
@@ -84,10 +86,63 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
         hasStoredCredential: false,
     });
 
-    // Check for stored credential on mount
+    // Check for stored credential and session on mount
     useEffect(() => {
-        const stored = localStorage.getItem(CREDENTIAL_STORAGE_KEY);
-        setState((prev) => ({ ...prev, hasStoredCredential: !!stored }));
+        const restoreSession = async () => {
+            const storedCredential = localStorage.getItem(CREDENTIAL_STORAGE_KEY);
+            const storedSession = localStorage.getItem(SESSION_STORAGE_KEY);
+            const storedAddress = localStorage.getItem(DEVICE_ADDRESS_STORAGE_KEY);
+
+            if (!storedCredential) {
+                setState((prev) => ({ ...prev, hasStoredCredential: false }));
+                return;
+            }
+
+            setState((prev) => ({ ...prev, hasStoredCredential: true }));
+
+            // Check if we have a valid session (not expired)
+            if (storedSession && storedAddress) {
+                try {
+                    const session = JSON.parse(storedSession);
+                    const now = Date.now();
+                    
+                    if (session.expiresAt && now < session.expiresAt) {
+                        // Session is still valid - restore without WebAuthn verification
+                        console.log("[Passkey] Restoring valid session, expires in", 
+                            Math.round((session.expiresAt - now) / (1000 * 60 * 60 * 24)), "days");
+                        
+                        const parsedCredential = JSON.parse(storedCredential);
+                        const credential: P256Credential = {
+                            id: parsedCredential.id,
+                            publicKey: parsedCredential.publicKey,
+                            raw: {
+                                id: parsedCredential.raw.id,
+                                type: parsedCredential.raw.type,
+                            } as PublicKeyCredential,
+                        };
+
+                        const webAuthnAccount = toWebAuthnAccount({ credential });
+
+                        setState({
+                            isLoading: false,
+                            isAuthenticated: true,
+                            credential,
+                            webAuthnAccount,
+                            smartAccount: null,
+                            smartAccountAddress: storedAddress as Address,
+                            error: null,
+                            hasStoredCredential: true,
+                        });
+                    } else {
+                        console.log("[Passkey] Session expired, will require re-authentication");
+                    }
+                } catch (e) {
+                    console.error("[Passkey] Error parsing session:", e);
+                }
+            }
+        };
+
+        restoreSession();
     }, []);
 
     const clearError = useCallback(() => {
@@ -164,6 +219,14 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
                 // Create smart account from credential
                 const { webAuthnAccount, smartAccount, smartAccountAddress } =
                     await createSmartAccountFromCredential(credential);
+
+                // Store session with expiration
+                const session = {
+                    createdAt: Date.now(),
+                    expiresAt: Date.now() + SESSION_DURATION_MS,
+                };
+                localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+                console.log("[Passkey] Session stored, expires in 30 days");
 
                 setState({
                     isLoading: false,
@@ -247,6 +310,14 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
             const { webAuthnAccount, smartAccount, smartAccountAddress } =
                 await createSmartAccountFromCredential(credential);
 
+            // Store/refresh session with expiration
+            const session = {
+                createdAt: Date.now(),
+                expiresAt: Date.now() + SESSION_DURATION_MS,
+            };
+            localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+            console.log("[Passkey] Session stored/refreshed, expires in 30 days");
+
             setState({
                 isLoading: false,
                 isAuthenticated: true,
@@ -273,6 +344,10 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
     }, [createSmartAccountFromCredential]);
 
     const logout = useCallback(() => {
+        // Clear session but keep credential (so they can re-login easily)
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        console.log("[Passkey] Session cleared on logout");
+        
         setState({
             isLoading: false,
             isAuthenticated: false,
