@@ -6,6 +6,8 @@ import Link from "next/link";
 import { huddle01ProjectId, isHuddle01Configured } from "@/config/huddle01";
 import { InstantRoomChat } from "@/components/InstantRoomChat";
 import { useWalletType } from "@/hooks/useWalletType";
+import { usePasskeyContext } from "@/context/PasskeyProvider";
+import { useEmailAuthContext } from "@/context/EmailAuthProvider";
 
 type RoomInfo = {
     id: string;
@@ -47,7 +49,12 @@ export default function RoomPage({
     params: Promise<{ code: string }>;
 }) {
     const { code } = use(params);
-    const { address: userWalletAddress } = useWalletType();
+    const { address: walletAddress } = useWalletType();
+    const { smartAccountAddress: passkeyAddress } = usePasskeyContext();
+    const { smartAccountAddress: emailAddress } = useEmailAuthContext();
+    
+    // Support passkey, email, and wallet authentication
+    const userWalletAddress = emailAddress || passkeyAddress || walletAddress || null;
     const [room, setRoom] = useState<RoomInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

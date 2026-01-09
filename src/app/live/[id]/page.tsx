@@ -91,6 +91,14 @@ export default function PublicLivePage() {
                 address = passkeyAddress.toLowerCase();
             }
             
+            // Check for email auth users (spritz_email_address)
+            if (!address) {
+                const emailAddress = localStorage.getItem("spritz_email_address");
+                if (emailAddress) {
+                    address = emailAddress.toLowerCase();
+                }
+            }
+            
             // Check for SIWE/SIWS authenticated users (spritz_auth_credentials)
             if (!address) {
                 const authCredentials = localStorage.getItem("spritz_auth_credentials");
