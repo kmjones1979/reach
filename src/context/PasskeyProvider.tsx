@@ -259,41 +259,88 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
         setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
         try {
-            // Try to get stored credential info
+            // Try to get stored credential info (may not exist on new devices)
             const storedCredential = localStorage.getItem(
                 CREDENTIAL_STORAGE_KEY
             );
 
-            if (!storedCredential) {
-                throw new Error("No passkey found. Please register first.");
+            let parsedCredential = storedCredential ? JSON.parse(storedCredential) : null;
+
+            // Build WebAuthn options - support both local and cross-device auth
+            const publicKeyOptions: PublicKeyCredentialRequestOptions = {
+                challenge: crypto.getRandomValues(new Uint8Array(32)),
+                userVerification: "preferred",
+                timeout: 120000, // 2 minutes for cross-device flow
+                rpId: typeof window !== "undefined" ? window.location.hostname : undefined,
+            };
+
+            // If we have a stored credential, prefer it but also allow discoverable credentials
+            // For cross-device auth (hybrid transport), we need to allow the authenticator
+            // to present credentials even if we don't have them stored locally
+            if (parsedCredential) {
+                console.log("[Passkey] Using stored credential for authentication");
+                publicKeyOptions.allowCredentials = [
+                    {
+                        id: Uint8Array.from(
+                            atob(
+                                parsedCredential.id
+                                    .replace(/-/g, "+")
+                                    .replace(/_/g, "/")
+                            ),
+                            (c) => c.charCodeAt(0)
+                        ),
+                        type: "public-key",
+                        // Allow all transports including hybrid (cross-device QR code)
+                        transports: ["internal", "hybrid", "usb", "ble", "nfc"],
+                    },
+                ];
+            } else {
+                // No local credential - use discoverable credentials mode
+                // This enables cross-device auth where the passkey is synced via
+                // Google Password Manager, iCloud Keychain, etc.
+                console.log("[Passkey] No local credential, using discoverable credentials mode for cross-device auth");
+                // Empty allowCredentials = discoverable credentials mode
+                publicKeyOptions.allowCredentials = [];
             }
 
-            const parsedCredential = JSON.parse(storedCredential);
-
-            // Use WebAuthn to authenticate with the stored credential
+            console.log("[Passkey] Initiating WebAuthn authentication...");
+            
+            // Use WebAuthn to authenticate
             const assertion = await navigator.credentials.get({
-                publicKey: {
-                    challenge: crypto.getRandomValues(new Uint8Array(32)),
-                    allowCredentials: [
-                        {
-                            id: Uint8Array.from(
-                                atob(
-                                    parsedCredential.id
-                                        .replace(/-/g, "+")
-                                        .replace(/_/g, "/")
-                                ),
-                                (c) => c.charCodeAt(0)
-                            ),
-                            type: "public-key",
-                        },
-                    ],
-                    userVerification: "preferred",
-                    timeout: 60000,
-                },
-            });
+                publicKey: publicKeyOptions,
+            }) as PublicKeyCredential | null;
 
             if (!assertion) {
                 throw new Error("Authentication failed. Please try again.");
+            }
+
+            console.log("[Passkey] WebAuthn authentication successful");
+
+            // For cross-device auth, we need to extract credential info from the assertion
+            // since we may not have it stored locally
+            if (!parsedCredential) {
+                // Extract credential ID from assertion response
+                const credentialId = btoa(
+                    String.fromCharCode(...new Uint8Array(assertion.rawId))
+                ).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+                
+                console.log("[Passkey] Cross-device auth: extracted credential ID:", credentialId.slice(0, 20) + "...");
+                
+                // For cross-device auth, we need to store minimal credential info
+                // The public key isn't directly available from assertion, so we'll
+                // need to handle this case specially
+                parsedCredential = {
+                    id: credentialId,
+                    publicKey: "cross-device-authenticated", // Placeholder - real key verification happens server-side
+                    raw: {
+                        id: credentialId,
+                        type: "public-key",
+                    },
+                };
+                
+                // Store the credential for future local auth
+                localStorage.setItem(CREDENTIAL_STORAGE_KEY, JSON.stringify(parsedCredential));
+                console.log("[Passkey] Stored cross-device credential locally for future use");
             }
 
             // Reconstruct credential
