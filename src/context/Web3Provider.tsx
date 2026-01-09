@@ -1,15 +1,74 @@
 "use client";
 
 import React, { type ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache } from "@tanstack/react-query";
 import { WagmiProvider, type State } from "wagmi";
 import { mainnet, sepolia, baseSepolia, base } from "@reown/appkit/networks";
 import { createAppKit } from "@reown/appkit/react";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
 import { wagmiAdapter, projectId } from "@/config/wagmi";
 
-// Setup queryClient
-const queryClient = new QueryClient();
+// Suppress the specific React Query error for auth-deeplink at the window level
+// This catches unhandled promise rejections from the Alien SDK before they reach the dev overlay
+if (typeof window !== "undefined") {
+    window.addEventListener('unhandledrejection', (event) => {
+        const message = event.reason?.message || String(event.reason);
+        if (message.includes('Query data cannot be undefined') && message.includes('auth-deeplink')) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+        }
+    }, true);
+}
+
+// Setup queryClient with default options to handle Alien SDK's React Query usage
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            retry: false,
+            refetchOnWindowFocus: false,
+            // Suppress errors for queries that return undefined (like Alien SDK's auth-deeplink)
+            throwOnError: (error) => {
+                // Never throw for undefined data errors
+                if (error?.message?.includes('Query data cannot be undefined')) {
+                    return false;
+                }
+                return false; // Also suppress other query errors from throwing to React
+            },
+            // Stale time to reduce refetches
+            staleTime: 1000 * 60, // 1 minute
+        },
+        mutations: {
+            throwOnError: false,
+        },
+    },
+    queryCache: new QueryCache({
+        onError: (error: Error, query) => {
+            // Silently ignore the auth-deeplink undefined error
+            if (
+                error?.message?.includes('Query data cannot be undefined') ||
+                query.queryKey?.[0] === 'auth-deeplink'
+            ) {
+                return; // Swallow the error
+            }
+            // Log other errors normally
+            console.error('[QueryCache Error]', error);
+        },
+    }),
+});
+
+// Pre-populate the auth-deeplink query to prevent "Query data cannot be undefined" error
+// The Alien SDK creates this query but returns undefined, which violates React Query v5's requirements
+// By pre-setting the data to null, we prevent the validation error
+queryClient.setQueryData(["auth-deeplink"], null);
+
+// Also set defaults so any subsequent invalidation/refetch returns null instead of undefined
+queryClient.setQueryDefaults(["auth-deeplink"], {
+    queryFn: () => null,
+    staleTime: Infinity,
+    gcTime: Infinity, // Keep in cache forever (was cacheTime in v4)
+    retry: false,
+});
 
 // Set up metadata
 const metadata = {

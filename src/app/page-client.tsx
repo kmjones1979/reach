@@ -8,12 +8,14 @@ import { useAppKitAccount, useDisconnect } from "@reown/appkit/react";
 import { PasskeyAuth } from "@/components/PasskeyAuth";
 import { EmailAuth } from "@/components/EmailAuth";
 import { WalletConnect } from "@/components/WalletConnect";
+import { AlienAuth } from "@/components/AlienAuth";
 import { Dashboard } from "@/components/Dashboard";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { Globe } from "@/components/Globe";
 import { SpritzLogo } from "@/components/SpritzLogo";
 import { usePasskeyContext } from "@/context/PasskeyProvider";
 import { useEmailAuthContext } from "@/context/EmailAuthProvider";
+import { useAlienAuthContext } from "@/context/AlienAuthProvider";
 import { useWalletType, type WalletType } from "@/hooks/useWalletType";
 import { useAuth } from "@/context/AuthProvider";
 import {
@@ -62,7 +64,7 @@ function hasSavedWalletSession(): boolean {
 }
 
 export default function Home() {
-    const [activeTab, setActiveTab] = useState<"wallet" | "email" | "passkey">("wallet");
+    const [activeTab, setActiveTab] = useState<"wallet" | "email" | "passkey" | "digitalid">("wallet");
     
     // EVM wallet via wagmi
     const { address: wagmiAddress, isConnected: isWagmiConnected, isReconnecting } = useAccount();
@@ -98,6 +100,13 @@ export default function Home() {
         isLoading: isEmailLoading,
         logout: emailLogout,
     } = useEmailAuthContext();
+
+    const {
+        isAuthenticated: isAlienAuthenticated,
+        alienAddress,
+        isLoading: isAlienLoading,
+        logout: alienLogout,
+    } = useAlienAuthContext();
 
     // SIWE Authentication
     const {
@@ -222,35 +231,40 @@ export default function Home() {
     }, [mounted, initializing, isWalletConnected, walletAddress, isSiweAuthenticated, isSiweLoading, signingIn, siweSignIn, walletType]);
 
     // Determine the active user address (supports both EVM and Solana)
-    // Can come from email auth, passkey, connected wallet, or authenticated SIWE user
+    // Can come from email auth, passkey, Alien identity, connected wallet, or authenticated SIWE user
+    // Note: alienAddress should be consistent (user_id from Alien SDK), not session-based
     const userAddress: string | null = mounted
-        ? emailAddress || passkeyAddress || walletAddress || siweUser?.walletAddress || null
+        ? emailAddress || passkeyAddress || alienAddress || walletAddress || siweUser?.walletAddress || null
         : null;
 
     // Determine wallet type for dashboard
     // Use connected wallet type, or infer from SIWE user address format
-    // Email and passkey users always use EVM (derived addresses)
+    // Email, passkey, and Alien users use EVM (derived addresses)
     const activeWalletType: WalletType = isEmailAuthenticated
         ? "evm" // Email users always use EVM (derived addresses)
         : isPasskeyAuthenticated
         ? "evm" // Passkey users always use EVM (smart accounts)
+        : isAlienAuthenticated
+        ? "evm" // Alien users use EVM (identity addresses)
         : walletType || (siweUser?.walletAddress?.startsWith("0x") ? "evm" : siweUser?.walletAddress ? "solana" : null);
 
     // Require authentication for all users
-    // Email auth, passkey auth, or SIWE/SIWS authentication
+    // Email auth, passkey auth, Alien auth, or SIWE/SIWS authentication
     const isFullyAuthenticated = mounted && (
         isEmailAuthenticated ||
-        isPasskeyAuthenticated || 
+        isPasskeyAuthenticated ||
+        isAlienAuthenticated ||
         isSiweAuthenticated
     );
 
     // Show loading while checking auth state
-    // If already authenticated via email/passkey/SIWE, don't wait for wallet reconnection
+    // If already authenticated via email/passkey/Alien/SIWE, don't wait for wallet reconnection
     // Auth credentials are self-contained and can work without wallet
     const isCheckingAuth =
         !mounted || 
         isPasskeyLoading ||
-        isEmailLoading || 
+        isEmailLoading ||
+        (isAlienLoading && !isAlienAuthenticated) ||
         (isSiweLoading && !isSiweAuthenticated) ||
         (initializing && !isSiweAuthenticated) ||
         (isWalletReconnecting && !isSiweAuthenticated);
@@ -273,6 +287,12 @@ export default function Home() {
         if (isEmailAuthenticated) {
             emailLogout();
             // emailLogout already reloads, so return early
+            return;
+        }
+        // Logout Alien if authenticated
+        if (isAlienAuthenticated) {
+            alienLogout();
+            // alienLogout already reloads, so return early
             return;
         }
         // Clear wallet-related localStorage to ensure clean state
@@ -593,6 +613,17 @@ export default function Home() {
                             >
                                 Passkey
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("digitalid")}
+                                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                                    activeTab === "digitalid"
+                                        ? "bg-[#FF5500] text-white shadow-lg shadow-[#FB8D22]/25"
+                                        : "text-zinc-400 hover:text-white"
+                                }`}
+                            >
+                                Digital ID
+                            </button>
                         </div>
 
                         {/* Tab Content */}
@@ -629,6 +660,17 @@ export default function Home() {
                                         transition={{ duration: 0.2 }}
                                     >
                                         <PasskeyAuth />
+                                    </motion.div>
+                                )}
+                                {activeTab === "digitalid" && (
+                                    <motion.div
+                                        key="digitalid"
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 10 }}
+                                        transition={{ duration: 0.2 }}
+                                    >
+                                        <AlienAuth />
                                     </motion.div>
                                 )}
                             </AnimatePresence>

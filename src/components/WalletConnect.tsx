@@ -152,7 +152,7 @@ export function WalletConnect() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="w-full flex flex-col items-center justify-center"
+            className="w-full flex flex-col items-center justify-center gap-4"
         >
             <button
                 onClick={() => open()}
@@ -169,16 +169,12 @@ export function WalletConnect() {
                     <span>Connect Wallet</span>
                 </span>
             </button>
-            <p className="text-center text-zinc-500 text-xs mt-3">
+            <p className="text-center text-zinc-500 text-xs">
                 MetaMask, Coinbase, Phantom, Solflare & more
             </p>
         </motion.div>
     );
 }
-
-
-
-
 
 
 
