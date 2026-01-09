@@ -588,7 +588,7 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 [PolyForm Noncommercial License 1.0.0](LICENSE)
 
-Commercial use requires a separate license. Contact kevin@kevinjonescreates.com for commercial licensing.
+Commercial use requires a separate license. Contact connect@spritz.chat for commercial licensing.
 
 ---
 

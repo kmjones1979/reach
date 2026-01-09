@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { PixelArtShare } from "./PixelArtShare";
 
 // IPFS gateway fallback order (fastest/most reliable first)
 const IPFS_GATEWAYS = [
@@ -12,7 +13,7 @@ const IPFS_GATEWAYS = [
 ];
 
 // Extract CID from any IPFS URL
-function extractCID(url: string): string | null {
+export function extractCID(url: string): string | null {
     // Match patterns like:
     // https://gateway.pinata.cloud/ipfs/QmXxx
     // https://ipfs.io/ipfs/bafyxxx
@@ -41,6 +42,8 @@ type PixelArtImageProps = {
     className?: string;
     onClick?: () => void;
     size?: "sm" | "md" | "lg";
+    showShareButton?: boolean; // Show persistent share button
+    hideOverlay?: boolean; // Hide all overlays (for lightbox view)
 };
 
 export function PixelArtImage({
@@ -49,6 +52,8 @@ export function PixelArtImage({
     className = "",
     onClick,
     size = "md",
+    showShareButton = false,
+    hideOverlay = false,
 }: PixelArtImageProps) {
     const [currentSrc, setCurrentSrc] = useState(src);
     const [isLoading, setIsLoading] = useState(true);
@@ -141,7 +146,7 @@ export function PixelArtImage({
     }
 
     return (
-        <div className={`${containerClasses} relative bg-zinc-700`}>
+        <div className={`${containerClasses} relative bg-zinc-700 group`}>
             {/* Loading skeleton */}
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-zinc-700 animate-pulse">
@@ -197,6 +202,18 @@ export function PixelArtImage({
                 onClick={onClick}
                 loading="lazy"
             />
+
+            {/* Share button overlay - always visible or on hover based on prop */}
+            {!hideOverlay && !isLoading && !hasError && (
+                <div 
+                    className={`absolute bottom-1 right-1 ${
+                        showShareButton ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    } transition-opacity z-10`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <PixelArtShare imageUrl={src} compact />
+                </div>
+            )}
         </div>
     );
 }
