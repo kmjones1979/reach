@@ -259,7 +259,7 @@ function AlienAuthInner({ children }: { children: ReactNode }) {
 export function AlienAuthProvider({ children }: { children: ReactNode }) {
     // Get config from environment variables
     const ssoBaseUrl = process.env.NEXT_PUBLIC_ALIEN_SSO_BASE_URL || "https://sso.alien-api.com";
-    const providerAddress = process.env.NEXT_PUBLIC_ALIEN_PROVIDER_ADDRESS || "000000010400000000000ea97cc74f25";
+    const providerAddress = process.env.NEXT_PUBLIC_ALIEN_PROVIDER_ADDRESS || "000000010400000000000f89739b0806";
 
     // Check if we're on the client
     const [isClient, setIsClient] = useState(false);
