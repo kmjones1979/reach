@@ -50,7 +50,7 @@ export function ChannelChatModal({
     const [addingFriend, setAddingFriend] = useState<string | null>(null);
     const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
     const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -212,7 +212,7 @@ export function ChannelChatModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center ${isFullscreen ? "" : "p-4"}`}
+                className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center ${isFullscreen ? "pt-2" : "p-4"}`}
                 style={isFullscreen ? {} : { paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 100px, 120px)' }}
                 onClick={onClose}
             >

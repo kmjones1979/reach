@@ -70,7 +70,7 @@ export function ChatModal({
     const [showMsgReactions, setShowMsgReactions] = useState<string | null>(
         null
     );
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(true);
     const [showSearch, setShowSearch] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
 
@@ -801,7 +801,7 @@ export function ChatModal({
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className={`fixed z-50 ${
                             isFullscreen
-                                ? "inset-0"
+                                ? "top-2 left-0 right-0 bottom-0"
                                 : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-lg max-h-[65vh] h-[500px]"
                         }`}
                         style={isFullscreen ? {} : { marginBottom: '60px' }}

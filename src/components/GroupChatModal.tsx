@@ -79,14 +79,16 @@ export function GroupChatModal({
     const [isLeavingGroup, setIsLeavingGroup] = useState(false);
     const [showManageMenu, setShowManageMenu] = useState(false);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-    const [memberENSData, setMemberENSData] = useState<Map<string, ENSResolution>>(new Map());
-    
+    const [memberENSData, setMemberENSData] = useState<
+        Map<string, ENSResolution>
+    >(new Map());
+
     const { resolveAddresses } = useENS();
     const [showReactionPicker, setShowReactionPicker] = useState<string | null>(
         null
     );
     const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const streamRef = useRef<any>(null);
@@ -269,7 +271,9 @@ export function GroupChatModal({
 
         if (addressesToResolve.length === 0) return;
 
-        console.log(`[GroupChat] Resolving ENS for ${addressesToResolve.length} members`);
+        console.log(
+            `[GroupChat] Resolving ENS for ${addressesToResolve.length} members`
+        );
 
         resolveAddresses(addressesToResolve).then((results) => {
             if (results.size > 0) {
@@ -402,11 +406,11 @@ export function GroupChatModal({
         // First check getUserInfo (friends list, cached data)
         const info = getUserInfo?.(address);
         if (info?.name) return info.name;
-        
+
         // Then check our locally resolved ENS data
         const ensData = memberENSData.get(address.toLowerCase());
         if (ensData?.ensName) return ensData.ensName;
-        
+
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
 
@@ -415,11 +419,11 @@ export function GroupChatModal({
         // First check getUserInfo (friends list, cached data)
         const userInfoAvatar = getUserInfo?.(address)?.avatar;
         if (userInfoAvatar) return userInfoAvatar;
-        
+
         // Then check our locally resolved ENS data
         const ensData = memberENSData.get(address.toLowerCase());
         if (ensData?.avatar) return ensData.avatar;
-        
+
         return null;
     };
 
@@ -545,13 +549,17 @@ export function GroupChatModal({
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className={`fixed z-50 ${
                             isFullscreen
-                                ? "inset-0"
+                                ? "top-2 left-0 right-0 bottom-0"
                                 : "inset-4 bottom-32 sm:inset-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg sm:max-h-[65vh] sm:h-[550px]"
                         }`}
                     >
-                        <div className={`bg-zinc-900 h-full flex flex-col overflow-hidden ${
-                            isFullscreen ? "" : "border border-zinc-800 rounded-2xl shadow-2xl"
-                        }`}>
+                        <div
+                            className={`bg-zinc-900 h-full flex flex-col overflow-hidden ${
+                                isFullscreen
+                                    ? ""
+                                    : "border border-zinc-800 rounded-2xl shadow-2xl"
+                            }`}
+                        >
                             {/* Header */}
                             <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
                                 <button
@@ -982,15 +990,22 @@ export function GroupChatModal({
                                                     <div className="flex-shrink-0">
                                                         {senderAvatar ? (
                                                             <img
-                                                                src={senderAvatar}
+                                                                src={
+                                                                    senderAvatar
+                                                                }
                                                                 alt=""
                                                                 className="w-8 h-8 rounded-full object-cover"
                                                             />
                                                         ) : (
                                                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-xs font-bold">
                                                                 {senderAddress
-                                                                    ? formatAddress(senderAddress)
-                                                                          .slice(0, 2)
+                                                                    ? formatAddress(
+                                                                          senderAddress
+                                                                      )
+                                                                          .slice(
+                                                                              0,
+                                                                              2
+                                                                          )
                                                                           .toUpperCase()
                                                                     : "?"}
                                                             </div>

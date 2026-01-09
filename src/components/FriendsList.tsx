@@ -182,10 +182,17 @@ const FriendCard = memo(function FriendCard({
                         </svg>
                     </button>
 
-                    {/* Avatar & Info - Clickable to expand on mobile */}
+                    {/* Avatar & Info - Clickable to open chat */}
                     <button
-                        onClick={() => onToggleExpand(friend.id)}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left sm:cursor-default"
+                        onClick={() => {
+                            // Open chat if available, otherwise expand
+                            if (onChat && !hideChat && wakuStatus !== false) {
+                                onChat(friend);
+                            } else {
+                                onToggleExpand(friend.id);
+                            }
+                        }}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
                     >
                         {/* Avatar */}
                         <div className="relative flex-shrink-0">
