@@ -487,8 +487,8 @@ export function GroupChatModal({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className={`fixed z-50 ${
-                            isFullscreen 
-                                ? "inset-4 sm:inset-6" 
+                            isFullscreen
+                                ? "inset-4 sm:inset-6"
                                 : "inset-4 bottom-32 sm:inset-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg sm:max-h-[65vh] sm:h-[550px]"
                         }`}
                     >
@@ -592,17 +592,43 @@ export function GroupChatModal({
 
                                 {/* Fullscreen Toggle */}
                                 <button
-                                    onClick={() => setIsFullscreen(!isFullscreen)}
+                                    onClick={() =>
+                                        setIsFullscreen(!isFullscreen)
+                                    }
                                     className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
-                                    title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                                    title={
+                                        isFullscreen
+                                            ? "Exit fullscreen"
+                                            : "Fullscreen"
+                                    }
                                 >
                                     {isFullscreen ? (
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                                        <svg
+                                            className="w-5 h-5"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"
+                                            />
                                         </svg>
                                     ) : (
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                                        <svg
+                                            className="w-5 h-5"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+                                            />
                                         </svg>
                                     )}
                                 </button>
@@ -710,9 +736,13 @@ export function GroupChatModal({
                                     </AnimatePresence>
                                 </div>
 
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FB8D22] to-[#FF5500] flex items-center justify-center">
+                                {/* Close Button */}
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                                >
                                     <svg
-                                        className="w-5 h-5 text-white"
+                                        className="w-5 h-5 text-zinc-400"
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
@@ -721,10 +751,10 @@ export function GroupChatModal({
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
                                             strokeWidth={2}
-                                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                                            d="M6 18L18 6M6 6l12 12"
                                         />
                                     </svg>
-                                </div>
+                                </button>
                             </div>
 
                             {/* Members Panel */}

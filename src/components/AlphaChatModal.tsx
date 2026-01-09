@@ -429,6 +429,26 @@ export function AlphaChatModal({
                                     </div>
                                 )}
 
+                                {/* Close Button */}
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                                >
+                                    <svg
+                                        className="w-5 h-5 text-zinc-400"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M6 18L18 6M6 6l12 12"
+                                        />
+                                    </svg>
+                                </button>
+
                                 {/* Alpha Icon */}
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
                                     <span className="text-lg">α</span>
