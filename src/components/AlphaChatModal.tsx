@@ -263,12 +263,14 @@ export function AlphaChatModal({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className={`fixed z-50 ${
-                            isFullscreen 
-                                ? "inset-4 sm:inset-6" 
+                            isFullscreen
+                                ? "inset-0"
                                 : "inset-4 bottom-32 sm:inset-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg sm:max-h-[65vh] sm:h-[550px]"
                         }`}
                     >
-                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl h-full flex flex-col overflow-hidden">
+                        <div className={`bg-zinc-900 h-full flex flex-col overflow-hidden ${
+                            isFullscreen ? "" : "border border-zinc-800 rounded-2xl shadow-2xl"
+                        }`}>
                             {/* Header */}
                             <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
                                 <button

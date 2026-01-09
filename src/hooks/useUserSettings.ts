@@ -16,6 +16,7 @@ export type UserSettings = {
     soundEnabled: boolean;
     decentralizedCalls: boolean;
     publicLandingEnabled: boolean;
+    publicBio: string;
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -25,6 +26,7 @@ const DEFAULT_SETTINGS: UserSettings = {
     soundEnabled: true,
     decentralizedCalls: false, // Default to Agora until Huddle01 is fully integrated
     publicLandingEnabled: false, // Default to off for privacy
+    publicBio: "",
 };
 
 // Preset status options
@@ -76,6 +78,7 @@ export function useUserSettings(userAddress: string | null) {
                         soundEnabled: data.sound_enabled ?? true,
                         decentralizedCalls: data.decentralized_calls ?? false, // Default to Agora
                         publicLandingEnabled: data.public_landing_enabled ?? false,
+                        publicBio: data.public_bio || "",
                     });
                 }
             } catch (err) {
@@ -118,6 +121,7 @@ export function useUserSettings(userAddress: string | null) {
                             decentralized_calls:
                                 updatedSettings.decentralizedCalls,
                             public_landing_enabled: updatedSettings.publicLandingEnabled,
+                            public_bio: updatedSettings.publicBio,
                             updated_at: new Date().toISOString(),
                         },
                         { onConflict: "wallet_address" }

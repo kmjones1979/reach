@@ -250,6 +250,7 @@ function DashboardContent({
     // User settings (status, DND, sound)
     const {
         settings: userSettings,
+        updateSettings,
         setStatus,
         toggleDnd,
         toggleSound,
@@ -4152,6 +4153,7 @@ function DashboardContent({
                 onToggleDecentralizedCalls={toggleDecentralizedCalls}
                 isHuddle01Configured={isHuddle01Configured}
                 onTogglePublicLanding={togglePublicLanding}
+                onUpdateBio={(bio) => updateSettings({ publicBio: bio })}
                 pushSupported={pushSupported}
                 pushPermission={pushPermission}
                 pushSubscribed={pushSubscribed}

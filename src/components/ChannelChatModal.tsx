@@ -212,7 +212,7 @@ export function ChannelChatModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center ${isFullscreen ? "" : "p-4"}`}
                 style={isFullscreen ? {} : { paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 100px, 120px)' }}
                 onClick={onClose}
             >
@@ -220,10 +220,10 @@ export function ChannelChatModal({
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    className={`bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col overflow-hidden ${
+                    className={`bg-zinc-900 flex flex-col overflow-hidden ${
                         isFullscreen
                             ? "w-full h-full max-w-none max-h-none"
-                            : "w-full max-w-2xl max-h-[70vh] h-[600px]"
+                            : "w-full max-w-2xl max-h-[70vh] h-[600px] border border-zinc-800 rounded-2xl"
                     }`}
                     onClick={(e) => e.stopPropagation()}
                 >

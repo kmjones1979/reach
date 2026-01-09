@@ -11,6 +11,7 @@ import {
     MESSAGE_REACTION_EMOJIS,
 } from "@/hooks/useChatFeatures";
 import { QuickReactionPicker } from "./EmojiPicker";
+import { useENS, type ENSResolution } from "@/hooks/useENS";
 
 type Friend = {
     id: string;
@@ -78,6 +79,9 @@ export function GroupChatModal({
     const [isLeavingGroup, setIsLeavingGroup] = useState(false);
     const [showManageMenu, setShowManageMenu] = useState(false);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [memberENSData, setMemberENSData] = useState<Map<string, ENSResolution>>(new Map());
+    
+    const { resolveAddresses } = useENS();
     const [showReactionPicker, setShowReactionPicker] = useState<string | null>(
         null
     );
@@ -241,6 +245,45 @@ export function GroupChatModal({
         markGroupAsRead,
     ]);
 
+    // Resolve ENS data for group members
+    useEffect(() => {
+        if (members.length === 0) return;
+
+        // Get all unique member addresses
+        const memberAddresses = members
+            .flatMap((m) => m.addresses)
+            .filter((addr) => addr && addr !== userAddress.toLowerCase());
+
+        if (memberAddresses.length === 0) return;
+
+        // Only resolve addresses not already in our ENS data or getUserInfo cache
+        const addressesToResolve = memberAddresses.filter((addr) => {
+            const normalized = addr.toLowerCase();
+            // Skip if we already have ENS data
+            if (memberENSData.has(normalized)) return false;
+            // Skip if getUserInfo already has data (from friends/cache)
+            const existingInfo = getUserInfo?.(addr);
+            if (existingInfo?.avatar) return false;
+            return true;
+        });
+
+        if (addressesToResolve.length === 0) return;
+
+        console.log(`[GroupChat] Resolving ENS for ${addressesToResolve.length} members`);
+
+        resolveAddresses(addressesToResolve).then((results) => {
+            if (results.size > 0) {
+                setMemberENSData((prev) => {
+                    const newMap = new Map(prev);
+                    results.forEach((value, key) => {
+                        newMap.set(key.toLowerCase(), value);
+                    });
+                    return newMap;
+                });
+            }
+        });
+    }, [members, userAddress, getUserInfo, resolveAddresses, memberENSData]);
+
     // Send message
     const handleSend = useCallback(async () => {
         if (!newMessage.trim() || isSending || !group) return;
@@ -354,16 +397,30 @@ export function GroupChatModal({
     const getPixelArtUrl = (content: string) =>
         content.replace("[PIXEL_ART]", "");
 
-    // Format member address - show username if available
+    // Format member address - show username/ENS name if available
     const formatAddress = (address: string) => {
+        // First check getUserInfo (friends list, cached data)
         const info = getUserInfo?.(address);
         if (info?.name) return info.name;
+        
+        // Then check our locally resolved ENS data
+        const ensData = memberENSData.get(address.toLowerCase());
+        if (ensData?.ensName) return ensData.ensName;
+        
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     };
 
-    // Get member avatar
+    // Get member avatar - checks getUserInfo first, then ENS data
     const getMemberAvatar = (address: string) => {
-        return getUserInfo?.(address)?.avatar || null;
+        // First check getUserInfo (friends list, cached data)
+        const userInfoAvatar = getUserInfo?.(address)?.avatar;
+        if (userInfoAvatar) return userInfoAvatar;
+        
+        // Then check our locally resolved ENS data
+        const ensData = memberENSData.get(address.toLowerCase());
+        if (ensData?.avatar) return ensData.avatar;
+        
+        return null;
     };
 
     // Get friends not already in the group
@@ -488,11 +545,13 @@ export function GroupChatModal({
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className={`fixed z-50 ${
                             isFullscreen
-                                ? "inset-4 sm:inset-6"
+                                ? "inset-0"
                                 : "inset-4 bottom-32 sm:inset-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg sm:max-h-[65vh] sm:h-[550px]"
                         }`}
                     >
-                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl h-full flex flex-col overflow-hidden">
+                        <div className={`bg-zinc-900 h-full flex flex-col overflow-hidden ${
+                            isFullscreen ? "" : "border border-zinc-800 rounded-2xl shadow-2xl"
+                        }`}>
                             {/* Header */}
                             <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
                                 <button
@@ -903,23 +962,47 @@ export function GroupChatModal({
                                                 m.inboxId === msg.senderInboxId
                                         )?.addresses[0];
 
+                                        const senderAvatar = senderAddress
+                                            ? getMemberAvatar(senderAddress)
+                                            : null;
+
                                         return (
                                             <motion.div
                                                 key={msg.id}
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                className={`flex ${
+                                                className={`flex gap-2 ${
                                                     isOwn
                                                         ? "justify-end"
                                                         : "justify-start"
                                                 }`}
                                             >
+                                                {/* Avatar for other users */}
+                                                {!isOwn && (
+                                                    <div className="flex-shrink-0">
+                                                        {senderAvatar ? (
+                                                            <img
+                                                                src={senderAvatar}
+                                                                alt=""
+                                                                className="w-8 h-8 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-xs font-bold">
+                                                                {senderAddress
+                                                                    ? formatAddress(senderAddress)
+                                                                          .slice(0, 2)
+                                                                          .toUpperCase()
+                                                                    : "?"}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <div
                                                     data-message-bubble
                                                     onClick={() =>
                                                         handleMessageTap(msg.id)
                                                     }
-                                                    className={`max-w-[75%] rounded-2xl px-4 py-2 relative cursor-pointer ${
+                                                    className={`max-w-[70%] rounded-2xl px-4 py-2 relative cursor-pointer ${
                                                         isOwn
                                                             ? "bg-[#FF5500] text-white rounded-br-md"
                                                             : "bg-zinc-800 text-white rounded-bl-md"
@@ -1019,16 +1102,32 @@ export function GroupChatModal({
                                                             />
                                                             {/* Download Button */}
                                                             <a
-                                                                href={getPixelArtUrl(msg.content)}
+                                                                href={getPixelArtUrl(
+                                                                    msg.content
+                                                                )}
                                                                 download="pixel-art.png"
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="absolute top-1 right-1 p-1.5 bg-black/60 hover:bg-black/80 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                                                                 title="Download"
-                                                                onClick={(e) => e.stopPropagation()}
+                                                                onClick={(e) =>
+                                                                    e.stopPropagation()
+                                                                }
                                                             >
-                                                                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                                <svg
+                                                                    className="w-4 h-4 text-white"
+                                                                    fill="none"
+                                                                    viewBox="0 0 24 24"
+                                                                    stroke="currentColor"
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        strokeWidth={
+                                                                            2
+                                                                        }
+                                                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                                                    />
                                                                 </svg>
                                                             </a>
                                                         </div>

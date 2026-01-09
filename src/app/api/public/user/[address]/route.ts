@@ -80,7 +80,7 @@ export async function GET(
         // Check if user has public landing enabled
         const { data: settings, error: settingsError } = await supabase
             .from("shout_user_settings")
-            .select("public_landing_enabled")
+            .select("public_landing_enabled, public_bio")
             .eq("wallet_address", normalizedAddress)
             .single();
 
@@ -104,6 +104,40 @@ export async function GET(
             .select("username")
             .eq("wallet_address", normalizedAddress)
             .maybeSingle();
+
+        // If ENS name not in database, try to resolve on-chain
+        let ensName = user?.ens_name || null;
+        let ensAvatar = user?.avatar_url || null;
+        
+        if (!ensName && normalizedAddress.startsWith("0x")) {
+            try {
+                const resolvedName = await publicClient.getEnsName({
+                    address: normalizedAddress as `0x${string}`,
+                });
+                if (resolvedName) {
+                    ensName = resolvedName;
+                    console.log("[Public User] Resolved ENS name on-chain:", resolvedName);
+                    
+                    // Also try to get ENS avatar if we found a name
+                    if (!ensAvatar) {
+                        try {
+                            const avatar = await publicClient.getEnsAvatar({
+                                name: normalize(resolvedName),
+                            });
+                            if (avatar) {
+                                ensAvatar = avatar;
+                                console.log("[Public User] Resolved ENS avatar on-chain");
+                            }
+                        } catch (avatarErr) {
+                            // Silent fail for avatar
+                        }
+                    }
+                }
+            } catch (ensErr) {
+                // Silent fail - many addresses don't have ENS
+                console.log("[Public User] No ENS found for address");
+            }
+        }
 
         // Fetch socials
         const { data: socials } = await supabase
@@ -132,8 +166,9 @@ export async function GET(
                 address: normalizedAddress,
                 name: user?.display_name || usernameData?.username || null,
                 username: usernameData?.username || null,
-                ensName: user?.ens_name || null,
-                avatarUrl: user?.avatar_url || null,
+                ensName: ensName,
+                avatarUrl: ensAvatar,
+                bio: settings?.public_bio || null,
             },
             socials: socials || [],
             agents: agents || [],

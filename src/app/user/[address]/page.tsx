@@ -12,6 +12,7 @@ type PublicProfile = {
         username: string | null;
         ensName: string | null;
         avatarUrl: string | null;
+        bio: string | null;
     };
     socials: Array<{
         platform: string;
@@ -158,14 +159,26 @@ export default function PublicUserPage() {
                             profile.user.ensName ||
                             formatAddress(profile.user.address)}
                     </h1>
+                    {/* Show ENS name if it exists and isn't already the title */}
                     {profile.user.ensName && profile.user.name && (
                         <p className="text-zinc-400 text-sm mb-2">
                             {profile.user.ensName}
                         </p>
                     )}
-                    <p className="text-zinc-500 text-sm font-mono">
+                    {/* Show ENS badge when ENS is the title (no display name) */}
+                    {profile.user.ensName && !profile.user.name && (
+                        <p className="text-emerald-400 text-xs mb-2 flex items-center justify-center gap-1">
+                            <span>✓</span> ENS Verified
+                        </p>
+                    )}
+                    <p className="text-zinc-500 text-sm font-mono mb-4">
                         {formatAddress(profile.user.address)}
                     </p>
+                    {profile.user.bio && (
+                        <p className="text-zinc-300 text-base max-w-md mx-auto">
+                            {profile.user.bio}
+                        </p>
+                    )}
                 </div>
 
                 {/* Socials */}

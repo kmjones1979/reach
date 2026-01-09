@@ -27,6 +27,7 @@ type SettingsModalProps = {
     isHuddle01Configured: boolean;
     // Public profile props
     onTogglePublicLanding: () => void;
+    onUpdateBio: (bio: string) => void;
     // Push notification props
     pushSupported: boolean;
     pushPermission: NotificationPermission;
@@ -57,6 +58,7 @@ export function SettingsModal({
     onToggleDecentralizedCalls,
     isHuddle01Configured,
     onTogglePublicLanding,
+    onUpdateBio,
     pushSupported,
     pushPermission,
     pushSubscribed,
@@ -482,9 +484,30 @@ export function SettingsModal({
                                         </div>
                                     </button>
 
-                                    {/* Copy Profile Link - Only show when enabled */}
+                                    {/* Public Profile Settings - Only show when enabled */}
                                     {settings.publicLandingEnabled && userAddress && (
-                                        <div className="mt-3 px-4">
+                                        <div className="mt-3 px-4 space-y-3">
+                                            {/* Bio Input */}
+                                            <div>
+                                                <label className="block text-sm text-zinc-400 mb-1">
+                                                    Profile Bio
+                                                </label>
+                                                <textarea
+                                                    value={settings.publicBio}
+                                                    onChange={(e) => {
+                                                        const newBio = e.target.value.slice(0, 280); // Max 280 chars like Twitter
+                                                        onUpdateBio(newBio);
+                                                    }}
+                                                    placeholder="Tell visitors about yourself..."
+                                                    rows={3}
+                                                    className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 text-sm resize-none"
+                                                />
+                                                <p className="text-xs text-zinc-500 mt-1 text-right">
+                                                    {settings.publicBio.length}/280
+                                                </p>
+                                            </div>
+
+                                            {/* Copy Profile Link Button */}
                                             <button
                                                 type="button"
                                                 onClick={() => {

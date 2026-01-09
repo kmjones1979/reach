@@ -800,13 +800,15 @@ export function ChatModal({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className={`fixed z-50 ${
-                            isFullscreen 
-                                ? "inset-4 sm:inset-6" 
+                            isFullscreen
+                                ? "inset-0"
                                 : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-lg max-h-[65vh] h-[500px]"
                         }`}
                         style={isFullscreen ? {} : { marginBottom: '60px' }}
                     >
-                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col h-full overflow-hidden">
+                        <div className={`bg-zinc-900 flex flex-col h-full overflow-hidden ${
+                            isFullscreen ? "" : "border border-zinc-800 rounded-2xl shadow-2xl"
+                        }`}>
                             {/* Header */}
                             <div className="flex items-center gap-3 p-4 border-b border-zinc-800">
                                 {peerAvatar ? (
