@@ -6,6 +6,8 @@ import { type Address } from "viem";
 import { useXMTPContext, type XMTPGroup } from "@/context/WakuProvider";
 import { PixelArtEditor } from "./PixelArtEditor";
 import { PixelArtImage } from "./PixelArtImage";
+import { useMessageReactions, MESSAGE_REACTION_EMOJIS } from "@/hooks/useChatFeatures";
+import { QuickReactionPicker } from "./EmojiPicker";
 
 type Friend = {
     id: string;
@@ -72,9 +74,18 @@ export function GroupChatModal({
     const [isAddingMember, setIsAddingMember] = useState(false);
     const [isLeavingGroup, setIsLeavingGroup] = useState(false);
     const [showManageMenu, setShowManageMenu] = useState(false);
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const streamRef = useRef<any>(null);
+
+    // Message reactions hook (using group.id as conversation_id)
+    const {
+        reactions: msgReactions,
+        fetchReactions: fetchMsgReactions,
+        toggleReaction: toggleMsgReaction,
+    } = useMessageReactions(userAddress, group?.id || null);
 
     const {
         isInitialized,
@@ -103,6 +114,14 @@ export function GroupChatModal({
             }, 100);
         }
     }, [isOpen, messages.length]);
+
+    // Fetch reactions for all messages
+    useEffect(() => {
+        const messageIds = messages.map((msg) => msg.id);
+        if (messageIds.length > 0) {
+            fetchMsgReactions(messageIds);
+        }
+    }, [messages, fetchMsgReactions]);
 
     // Load messages and members when modal opens
     useEffect(() => {
@@ -198,9 +217,21 @@ export function GroupChatModal({
         setError(null);
 
         try {
-            const result = await sendGroupMessage(group.id, newMessage.trim());
+            // Include reply context if replying
+            let messageContent = newMessage.trim();
+            if (replyingTo) {
+                const replySender = members.find(m => m.inboxId === replyingTo.senderInboxId)?.addresses[0];
+                const replyPreview = replyingTo.content.slice(0, 50) + (replyingTo.content.length > 50 ? "..." : "");
+                // Format sender inline - check getUserInfo first, then fallback to address truncation
+                const senderInfo = replySender ? getUserInfo?.(replySender) : null;
+                const senderDisplay = senderInfo?.name || (replySender ? `${replySender.slice(0, 6)}...${replySender.slice(-4)}` : "Unknown");
+                messageContent = `↩️ ${senderDisplay}: "${replyPreview}"\n\n${messageContent}`;
+            }
+            
+            const result = await sendGroupMessage(group.id, messageContent);
             if (result.success) {
                 setNewMessage("");
+                setReplyingTo(null);
             } else {
                 setError(result.error || "Failed to send");
             }
@@ -209,7 +240,7 @@ export function GroupChatModal({
         } finally {
             setIsSending(false);
         }
-    }, [newMessage, isSending, group, sendGroupMessage]);
+    }, [newMessage, isSending, group, sendGroupMessage, replyingTo, members, getUserInfo]);
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -761,6 +792,9 @@ export function GroupChatModal({
                                         const isPixelArt = isPixelArtMessage(
                                             msg.content
                                         );
+                                        const senderAddress = members.find(
+                                            (m) => m.inboxId === msg.senderInboxId
+                                        )?.addresses[0];
 
                                         return (
                                             <motion.div
@@ -774,7 +808,7 @@ export function GroupChatModal({
                                                 }`}
                                             >
                                                 <div
-                                                    className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+                                                    className={`max-w-[75%] rounded-2xl px-4 py-2 relative group/msg ${
                                                         isOwn
                                                             ? "bg-[#FF5500] text-white rounded-br-md"
                                                             : "bg-zinc-800 text-white rounded-bl-md"
@@ -782,19 +816,8 @@ export function GroupChatModal({
                                                 >
                                                     {!isOwn && (
                                                         <p className="text-xs text-zinc-400 mb-1">
-                                                            {members.find(
-                                                                (m) =>
-                                                                    m.inboxId ===
-                                                                    msg.senderInboxId
-                                                            )?.addresses[0]
-                                                                ? formatAddress(
-                                                                      members.find(
-                                                                          (m) =>
-                                                                              m.inboxId ===
-                                                                              msg.senderInboxId
-                                                                      )!
-                                                                          .addresses[0]
-                                                                  )
+                                                            {senderAddress
+                                                                ? formatAddress(senderAddress)
                                                                 : "Unknown"}
                                                         </p>
                                                     )}
@@ -808,6 +831,29 @@ export function GroupChatModal({
                                                             {msg.content}
                                                         </p>
                                                     )}
+
+                                                    {/* Reactions Display */}
+                                                    {msgReactions[msg.id]?.some(r => r.count > 0) && (
+                                                        <div className="flex flex-wrap gap-1 mt-2">
+                                                            {msgReactions[msg.id]
+                                                                ?.filter(r => r.count > 0)
+                                                                .map(reaction => (
+                                                                    <button
+                                                                        key={reaction.emoji}
+                                                                        onClick={() => toggleMsgReaction(msg.id, reaction.emoji)}
+                                                                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
+                                                                            reaction.hasReacted
+                                                                                ? isOwn ? "bg-white/30" : "bg-[#FB8D22]/30"
+                                                                                : isOwn ? "bg-white/10 hover:bg-white/20" : "bg-zinc-700/50 hover:bg-zinc-600/50"
+                                                                        }`}
+                                                                    >
+                                                                        <span>{reaction.emoji}</span>
+                                                                        <span className="text-[10px]">{reaction.count}</span>
+                                                                    </button>
+                                                                ))}
+                                                        </div>
+                                                    )}
+
                                                     <p
                                                         className={`text-xs mt-1 ${
                                                             isOwn
@@ -823,6 +869,41 @@ export function GroupChatModal({
                                                             }
                                                         )}
                                                     </p>
+
+                                                    {/* Hover Actions */}
+                                                    <div className={`absolute ${isOwn ? "left-0 -translate-x-full pr-2" : "right-0 translate-x-full pl-2"} top-0 opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1`}>
+                                                        <button
+                                                            onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
+                                                            className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-sm"
+                                                            title="React"
+                                                        >
+                                                            😊
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setReplyingTo(msg)}
+                                                            className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
+                                                            title="Reply"
+                                                        >
+                                                            <svg className="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Reaction Picker */}
+                                                    {showReactionPicker === msg.id && (
+                                                        <div className={`absolute ${isOwn ? "right-0" : "left-0"} -top-10 z-10`}>
+                                                            <QuickReactionPicker
+                                                                isOpen={true}
+                                                                onClose={() => setShowReactionPicker(null)}
+                                                                onSelect={async (emoji) => {
+                                                                    await toggleMsgReaction(msg.id, emoji);
+                                                                    setShowReactionPicker(null);
+                                                                }}
+                                                                emojis={MESSAGE_REACTION_EMOJIS}
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         );
@@ -830,6 +911,29 @@ export function GroupChatModal({
                                 )}
                                 <div ref={messagesEndRef} />
                             </div>
+
+                            {/* Reply Preview */}
+                            {replyingTo && (
+                                <div className="px-4 py-2 bg-zinc-800/50 border-t border-zinc-700 flex items-center gap-2">
+                                    <div className="w-1 h-8 bg-[#FB8D22] rounded-full" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-[#FB8D22]">
+                                            Replying to {replyingTo.senderInboxId?.toLowerCase() === userAddress?.toLowerCase() 
+                                                ? "yourself" 
+                                                : formatAddress(members.find(m => m.inboxId === replyingTo.senderInboxId)?.addresses[0] || "Unknown")}
+                                        </p>
+                                        <p className="text-xs text-zinc-400 truncate">{replyingTo.content}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setReplyingTo(null)}
+                                        className="w-6 h-6 flex items-center justify-center text-zinc-500 hover:text-white"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Input */}
                             <div className="p-4 border-t border-zinc-800">
@@ -867,7 +971,7 @@ export function GroupChatModal({
                                             setNewMessage(e.target.value)
                                         }
                                         onKeyDown={handleKeyPress}
-                                        placeholder="Type a message..."
+                                        placeholder={replyingTo ? "Type your reply..." : "Type a message..."}
                                         disabled={!isInitialized}
                                         className="flex-1 py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FB8D22]/50 focus:ring-2 focus:ring-[#FB8D22]/20 transition-all disabled:opacity-50"
                                     />

@@ -10,7 +10,26 @@ export type AlphaMessage = {
     content: string;
     message_type: "text" | "pixel_art" | "system";
     created_at: string;
+    reply_to_id?: string | null;
+    reply_to?: AlphaMessage | null;
 };
+
+export type AlphaReaction = {
+    id: string;
+    message_id: string;
+    user_address: string;
+    emoji: string;
+    created_at: string;
+};
+
+export type AlphaMessageReaction = {
+    emoji: string;
+    count: number;
+    hasReacted: boolean;
+    users: string[];
+};
+
+export const ALPHA_REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 export type AlphaMembership = {
     user_address: string;
@@ -22,19 +41,23 @@ export type AlphaMembership = {
 
 type AlphaChatState = {
     messages: AlphaMessage[];
+    reactions: Record<string, AlphaMessageReaction[]>;
     membership: AlphaMembership | null;
     unreadCount: number;
     isLoading: boolean;
     isMember: boolean;
+    replyingTo: AlphaMessage | null;
 };
 
 export function useAlphaChat(userAddress: string | null) {
     const [state, setState] = useState<AlphaChatState>({
         messages: [],
+        reactions: {},
         membership: null,
         unreadCount: 0,
         isLoading: true,
         isMember: false,
+        replyingTo: null,
     });
     const [isSending, setIsSending] = useState(false);
     const channelRef = useRef<RealtimeChannel | null>(null);
@@ -65,12 +88,46 @@ export function useAlphaChat(userAddress: string | null) {
                 return;
             }
 
-            // Get messages (last 100)
+            // Get messages (last 100) with reply_to data
             const { data: messages } = await supabase
                 .from("shout_alpha_messages")
-                .select("*")
+                .select("*, reply_to:reply_to_id(id, sender_address, content, message_type)")
                 .order("created_at", { ascending: true })
                 .limit(100);
+
+            // Get reactions for these messages
+            const messageIds = messages?.map(m => m.id) || [];
+            let reactionsData: AlphaReaction[] = [];
+            if (messageIds.length > 0) {
+                const { data } = await supabase
+                    .from("shout_alpha_reactions")
+                    .select("*")
+                    .in("message_id", messageIds);
+                reactionsData = data || [];
+            }
+
+            // Process reactions into grouped format
+            const processedReactions: Record<string, AlphaMessageReaction[]> = {};
+            messageIds.forEach(msgId => {
+                processedReactions[msgId] = ALPHA_REACTION_EMOJIS.map(emoji => ({
+                    emoji,
+                    count: 0,
+                    hasReacted: false,
+                    users: [],
+                }));
+            });
+            reactionsData.forEach(r => {
+                if (processedReactions[r.message_id]) {
+                    const idx = processedReactions[r.message_id].findIndex(x => x.emoji === r.emoji);
+                    if (idx >= 0) {
+                        processedReactions[r.message_id][idx].count++;
+                        processedReactions[r.message_id][idx].users.push(r.user_address);
+                        if (userAddress && r.user_address.toLowerCase() === userAddress.toLowerCase()) {
+                            processedReactions[r.message_id][idx].hasReacted = true;
+                        }
+                    }
+                }
+            });
 
             // Calculate unread count
             const unreadCount = messages?.filter(
@@ -79,10 +136,12 @@ export function useAlphaChat(userAddress: string | null) {
 
             setState({
                 messages: messages || [],
+                reactions: processedReactions,
                 membership,
                 unreadCount,
                 isLoading: false,
                 isMember: true,
+                replyingTo: null,
             });
         } catch (err) {
             console.error("[AlphaChat] Load error:", err);
@@ -132,27 +191,120 @@ export function useAlphaChat(userAddress: string | null) {
         loadData();
     }, [loadData]);
 
+    // Set replying to
+    const setReplyingTo = useCallback((message: AlphaMessage | null) => {
+        setState(prev => ({ ...prev, replyingTo: message }));
+    }, []);
+
     // Send a message
-    const sendMessage = useCallback(async (content: string, messageType: "text" | "pixel_art" = "text"): Promise<boolean> => {
+    const sendMessage = useCallback(async (content: string, messageType: "text" | "pixel_art" = "text", replyToId?: string): Promise<boolean> => {
         if (!isSupabaseConfigured || !supabase || !userAddress || !content.trim()) {
             return false;
         }
 
         setIsSending(true);
         try {
-            const { error } = await supabase.from("shout_alpha_messages").insert({
+            const insertData: Record<string, unknown> = {
                 sender_address: userAddress.toLowerCase(),
                 content: content.trim(),
                 message_type: messageType,
-            });
+            };
+            
+            // Add reply_to_id if replying or from state
+            const finalReplyToId = replyToId || state.replyingTo?.id;
+            if (finalReplyToId) {
+                insertData.reply_to_id = finalReplyToId;
+            }
+
+            const { error } = await supabase.from("shout_alpha_messages").insert(insertData);
 
             if (error) throw error;
+            
+            // Clear reply state
+            setState(prev => ({ ...prev, replyingTo: null }));
+            
             return true;
         } catch (err) {
             console.error("[AlphaChat] Send error:", err);
             return false;
         } finally {
             setIsSending(false);
+        }
+    }, [userAddress, state.replyingTo]);
+
+    // Toggle reaction
+    const toggleReaction = useCallback(async (messageId: string, emoji: string): Promise<boolean> => {
+        if (!isSupabaseConfigured || !supabase || !userAddress) return false;
+
+        try {
+            // Check if reaction exists
+            const { data: existing } = await supabase
+                .from("shout_alpha_reactions")
+                .select("id")
+                .eq("message_id", messageId)
+                .eq("user_address", userAddress.toLowerCase())
+                .eq("emoji", emoji)
+                .single();
+
+            if (existing) {
+                // Remove reaction
+                await supabase
+                    .from("shout_alpha_reactions")
+                    .delete()
+                    .eq("id", existing.id);
+
+                // Update local state
+                setState(prev => {
+                    const updated = { ...prev.reactions };
+                    if (updated[messageId]) {
+                        const idx = updated[messageId].findIndex(r => r.emoji === emoji);
+                        if (idx >= 0) {
+                            updated[messageId][idx] = {
+                                ...updated[messageId][idx],
+                                count: Math.max(0, updated[messageId][idx].count - 1),
+                                hasReacted: false,
+                                users: updated[messageId][idx].users.filter(u => u.toLowerCase() !== userAddress.toLowerCase()),
+                            };
+                        }
+                    }
+                    return { ...prev, reactions: updated };
+                });
+            } else {
+                // Add reaction
+                await supabase.from("shout_alpha_reactions").insert({
+                    message_id: messageId,
+                    user_address: userAddress.toLowerCase(),
+                    emoji,
+                });
+
+                // Update local state
+                setState(prev => {
+                    const updated = { ...prev.reactions };
+                    if (!updated[messageId]) {
+                        updated[messageId] = ALPHA_REACTION_EMOJIS.map(e => ({
+                            emoji: e,
+                            count: 0,
+                            hasReacted: false,
+                            users: [],
+                        }));
+                    }
+                    const idx = updated[messageId].findIndex(r => r.emoji === emoji);
+                    if (idx >= 0) {
+                        updated[messageId][idx] = {
+                            ...updated[messageId][idx],
+                            count: updated[messageId][idx].count + 1,
+                            hasReacted: true,
+                            users: [...updated[messageId][idx].users, userAddress.toLowerCase()],
+                        };
+                    }
+                    return { ...prev, reactions: updated };
+                });
+            }
+
+            return true;
+        } catch (err) {
+            console.error("[AlphaChat] Toggle reaction error:", err);
+            return false;
         }
     }, [userAddress]);
 
@@ -238,7 +390,9 @@ export function useAlphaChat(userAddress: string | null) {
                 isMember: false,
                 membership: null,
                 messages: [],
+                reactions: {},
                 unreadCount: 0,
+                replyingTo: null,
             }));
 
             return true;
@@ -275,6 +429,8 @@ export function useAlphaChat(userAddress: string | null) {
         leaveChannel,
         refreshUnreadCount,
         refresh: loadData,
+        setReplyingTo,
+        toggleReaction,
     };
 }
 

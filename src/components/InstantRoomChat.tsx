@@ -17,7 +17,19 @@ type Message = {
     content: string;
     timestamp: number;
     isMe: boolean;
+    replyTo?: {
+        id: string;
+        sender: string;
+        content: string;
+    };
 };
+
+type MessageReaction = {
+    emoji: string;
+    users: string[];
+};
+
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 // Dynamic imports for Waku
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,11 +91,14 @@ export function InstantRoomChat({
     onUnreadChange,
 }: InstantRoomChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
+    const [reactions, setReactions] = useState<Record<string, MessageReaction[]>>({});
     const [inputValue, setInputValue] = useState("");
     const [isConnected, setIsConnected] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nodeRef = useRef<any>(null);
@@ -255,6 +270,32 @@ export function InstantRoomChat({
         };
     }, [initializeWaku]);
 
+    // Toggle reaction
+    const toggleReaction = useCallback((messageId: string, emoji: string) => {
+        setReactions(prev => {
+            const updated = { ...prev };
+            if (!updated[messageId]) {
+                updated[messageId] = REACTION_EMOJIS.map(e => ({
+                    emoji: e,
+                    users: [],
+                }));
+            }
+            
+            const idx = updated[messageId].findIndex(r => r.emoji === emoji);
+            if (idx >= 0) {
+                const hasReacted = updated[messageId][idx].users.includes(displayName);
+                if (hasReacted) {
+                    updated[messageId][idx].users = updated[messageId][idx].users.filter(u => u !== displayName);
+                } else {
+                    updated[messageId][idx].users = [...updated[messageId][idx].users, displayName];
+                }
+            }
+            
+            return updated;
+        });
+        setShowReactionPicker(null);
+    }, [displayName]);
+
     // Send a message
     const sendMessage = useCallback(async () => {
         if (!inputValue.trim() || !nodeRef.current || !encoderRef.current)
@@ -262,7 +303,14 @@ export function InstantRoomChat({
 
         const messageId = generateMessageId();
         const timestamp = Date.now();
-        const content = inputValue.trim();
+        
+        // Include reply context if replying
+        let content = inputValue.trim();
+        const replyData = replyingTo ? {
+            id: replyingTo.id,
+            sender: replyingTo.sender,
+            content: replyingTo.content.slice(0, 50) + (replyingTo.content.length > 50 ? "..." : ""),
+        } : undefined;
 
         // Add to seen BEFORE sending to prevent duplicate when message comes back
         seenMessageIds.current.add(messageId);
@@ -274,15 +322,22 @@ export function InstantRoomChat({
             content,
             timestamp,
             isMe: true,
+            replyTo: replyData,
         };
         setMessages((prev) => [...prev, newMessage]);
         setInputValue("");
+        setReplyingTo(null);
 
         try {
+            // Include reply in message content for others to see
+            const sendContent = replyData 
+                ? `↩️ ${replyData.sender}: "${replyData.content}"\n\n${content}`
+                : content;
+            
             const messageObj = ChatMessage.create({
                 timestamp,
                 sender: displayName,
-                content,
+                content: sendContent,
                 messageId,
             });
 
@@ -294,7 +349,7 @@ export function InstantRoomChat({
         } catch (err) {
             console.error("[InstantRoomChat] Send error:", err);
         }
-    }, [inputValue, displayName]);
+    }, [inputValue, displayName, replyingTo]);
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -414,7 +469,7 @@ export function InstantRoomChat({
                                 }`}
                             >
                                 <div
-                                    className={`max-w-[85%] rounded-2xl px-3 py-2 ${
+                                    className={`max-w-[85%] rounded-2xl px-3 py-2 relative group/msg ${
                                         msg.isMe
                                             ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white"
                                             : "bg-zinc-800 text-white"
@@ -425,9 +480,72 @@ export function InstantRoomChat({
                                             {msg.sender}
                                         </p>
                                     )}
-                                    <p className="text-sm break-words">
+                                    <p className="text-sm break-words whitespace-pre-wrap">
                                         {msg.content}
                                     </p>
+
+                                    {/* Reactions Display */}
+                                    {reactions[msg.id]?.some(r => r.users.length > 0) && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {reactions[msg.id]
+                                                ?.filter(r => r.users.length > 0)
+                                                .map(reaction => (
+                                                    <button
+                                                        key={reaction.emoji}
+                                                        onClick={() => toggleReaction(msg.id, reaction.emoji)}
+                                                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
+                                                            reaction.users.includes(displayName)
+                                                                ? msg.isMe ? "bg-white/30" : "bg-orange-500/30 text-orange-300"
+                                                                : msg.isMe ? "bg-white/10 hover:bg-white/20" : "bg-zinc-700/50 hover:bg-zinc-600/50"
+                                                        }`}
+                                                    >
+                                                        <span>{reaction.emoji}</span>
+                                                        <span className="text-[10px]">{reaction.users.length}</span>
+                                                    </button>
+                                                ))}
+                                        </div>
+                                    )}
+
+                                    {/* Hover Actions */}
+                                    <div className={`absolute ${msg.isMe ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"} top-0 opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-0.5`}>
+                                        <button
+                                            onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
+                                            className="w-6 h-6 rounded-full bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center text-xs"
+                                            title="React"
+                                        >
+                                            😊
+                                        </button>
+                                        <button
+                                            onClick={() => setReplyingTo(msg)}
+                                            className="w-6 h-6 rounded-full bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center"
+                                            title="Reply"
+                                        >
+                                            <svg className="w-3 h-3 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    {/* Reaction Picker */}
+                                    {showReactionPicker === msg.id && (
+                                        <div className={`absolute ${msg.isMe ? "right-0" : "left-0"} -top-9 z-10 bg-zinc-800 border border-zinc-700 rounded-xl p-1 shadow-xl`}>
+                                            <div className="flex gap-0.5">
+                                                {REACTION_EMOJIS.map(emoji => (
+                                                    <button
+                                                        key={emoji}
+                                                        onClick={() => toggleReaction(msg.id, emoji)}
+                                                        className={`w-6 h-6 rounded flex items-center justify-center text-sm hover:bg-zinc-700 transition-colors ${
+                                                            reactions[msg.id]?.find(r => r.emoji === emoji)?.users.includes(displayName)
+                                                                ? "bg-orange-500/30"
+                                                                : ""
+                                                        }`}
+                                                    >
+                                                        {emoji}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <span className="text-xs text-zinc-500 mt-1 px-1">
                                     {formatTime(msg.timestamp)}
@@ -436,6 +554,27 @@ export function InstantRoomChat({
                         ))}
                         <div ref={messagesEndRef} />
                     </div>
+
+                    {/* Reply Preview */}
+                    {replyingTo && (
+                        <div className="px-3 py-2 bg-zinc-800/50 border-t border-zinc-700 flex items-center gap-2">
+                            <div className="w-0.5 h-6 bg-orange-500 rounded-full" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[10px] text-orange-400">
+                                    Replying to {replyingTo.isMe ? "yourself" : replyingTo.sender}
+                                </p>
+                                <p className="text-[10px] text-zinc-400 truncate">{replyingTo.content}</p>
+                            </div>
+                            <button
+                                onClick={() => setReplyingTo(null)}
+                                className="w-5 h-5 flex items-center justify-center text-zinc-500 hover:text-white"
+                            >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    )}
 
                     {/* Input */}
                     <div className="p-3 border-t border-zinc-800">
@@ -447,7 +586,7 @@ export function InstantRoomChat({
                                 onKeyDown={handleKeyPress}
                                 placeholder={
                                     isConnected
-                                        ? "Type a message..."
+                                        ? replyingTo ? "Type your reply..." : "Type a message..."
                                         : "Connecting..."
                                 }
                                 disabled={!isConnected}

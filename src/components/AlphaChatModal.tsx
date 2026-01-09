@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { AlphaMessage, AlphaMembership } from "@/hooks/useAlphaChat";
+import type { AlphaMessage, AlphaMembership, AlphaMessageReaction } from "@/hooks/useAlphaChat";
+import { ALPHA_REACTION_EMOJIS } from "@/hooks/useAlphaChat";
 import { PixelArtEditor } from "./PixelArtEditor";
 import { PixelArtImage } from "./PixelArtImage";
+import { QuickReactionPicker } from "./EmojiPicker";
 
 interface AlphaChatModalProps {
     isOpen: boolean;
@@ -13,15 +15,19 @@ interface AlphaChatModalProps {
     // Shared hook state from parent
     alphaChat: {
         messages: AlphaMessage[];
+        reactions: Record<string, AlphaMessageReaction[]>;
         membership: AlphaMembership | null;
         isMember: boolean;
         isLoading: boolean;
         isSending: boolean;
-        sendMessage: (content: string, messageType?: "text" | "pixel_art") => Promise<boolean>;
+        replyingTo: AlphaMessage | null;
+        sendMessage: (content: string, messageType?: "text" | "pixel_art", replyToId?: string) => Promise<boolean>;
         markAsRead: () => Promise<void>;
         toggleNotifications: () => Promise<boolean>;
         leaveChannel: () => Promise<boolean>;
         joinChannel: () => Promise<boolean>;
+        setReplyingTo: (message: AlphaMessage | null) => void;
+        toggleReaction: (messageId: string, emoji: string) => Promise<boolean>;
     };
     // For displaying usernames/avatars
     getUserInfo?: (address: string) => {
@@ -45,15 +51,19 @@ export function AlphaChatModal({
 }: AlphaChatModalProps) {
     const {
         messages,
+        reactions,
         membership,
         isMember,
         isLoading,
         isSending,
+        replyingTo,
         sendMessage,
         markAsRead,
         toggleNotifications,
         leaveChannel,
         joinChannel,
+        setReplyingTo,
+        toggleReaction,
     } = alphaChat;
 
     const [newMessage, setNewMessage] = useState("");
@@ -64,6 +74,7 @@ export function AlphaChatModal({
     const [isJoining, setIsJoining] = useState(false);
     const [selectedUser, setSelectedUser] = useState<string | null>(null);
     const [isAddingFriend, setIsAddingFriend] = useState(false);
+    const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const userPopupRef = useRef<HTMLDivElement>(null);
 
@@ -118,11 +129,17 @@ export function AlphaChatModal({
     const handleSend = useCallback(async () => {
         if (!newMessage.trim() || isSending) return;
 
-        const success = await sendMessage(newMessage.trim());
+        const success = await sendMessage(newMessage.trim(), "text", replyingTo?.id);
         if (success) {
             setNewMessage("");
         }
-    }, [newMessage, isSending, sendMessage]);
+    }, [newMessage, isSending, sendMessage, replyingTo]);
+
+    // Handle reaction
+    const handleReaction = async (messageId: string, emoji: string) => {
+        await toggleReaction(messageId, emoji);
+        setShowReactionPicker(null);
+    };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -526,12 +543,25 @@ export function AlphaChatModal({
                                                         )}
 
                                                         <div
-                                                            className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+                                                            className={`max-w-[75%] rounded-2xl px-4 py-2 relative group/msg ${
                                                                 isOwn
                                                                     ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-br-md"
                                                                     : "bg-zinc-800 text-white rounded-bl-md"
                                                             }`}
                                                         >
+                                                            {/* Reply Preview */}
+                                                            {msg.reply_to && (
+                                                                <div className={`mb-2 pb-2 border-b ${isOwn ? "border-white/20" : "border-zinc-700"}`}>
+                                                                    <div className="flex items-center gap-1 text-xs opacity-70">
+                                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                                        </svg>
+                                                                        <span>{formatSender(msg.reply_to.sender_address)}</span>
+                                                                    </div>
+                                                                    <p className="text-xs opacity-70 truncate">{msg.reply_to.content}</p>
+                                                                </div>
+                                                            )}
+
                                                             {!isOwn && (
                                                                 <button
                                                                     onClick={() => setSelectedUser(msg.sender_address)}
@@ -550,6 +580,29 @@ export function AlphaChatModal({
                                                                     {msg.content}
                                                                 </p>
                                                             )}
+
+                                                            {/* Reactions Display */}
+                                                            {reactions[msg.id]?.some(r => r.count > 0) && (
+                                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                                    {reactions[msg.id]
+                                                                        ?.filter(r => r.count > 0)
+                                                                        .map(reaction => (
+                                                                            <button
+                                                                                key={reaction.emoji}
+                                                                                onClick={() => handleReaction(msg.id, reaction.emoji)}
+                                                                                className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
+                                                                                    reaction.hasReacted
+                                                                                        ? isOwn ? "bg-white/30" : "bg-orange-500/30 text-orange-300"
+                                                                                        : isOwn ? "bg-white/10 hover:bg-white/20" : "bg-zinc-700/50 hover:bg-zinc-600/50"
+                                                                                }`}
+                                                                            >
+                                                                                <span>{reaction.emoji}</span>
+                                                                                <span className="text-[10px]">{reaction.count}</span>
+                                                                            </button>
+                                                                        ))}
+                                                                </div>
+                                                            )}
+
                                                             <p
                                                                 className={`text-xs mt-1 ${
                                                                     isOwn
@@ -564,6 +617,38 @@ export function AlphaChatModal({
                                                                     minute: "2-digit",
                                                                 })}
                                                             </p>
+
+                                                            {/* Hover Actions */}
+                                                            <div className={`absolute ${isOwn ? "left-0 -translate-x-full pr-2" : "right-0 translate-x-full pl-2"} top-0 opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1`}>
+                                                                <button
+                                                                    onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
+                                                                    className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-sm"
+                                                                    title="React"
+                                                                >
+                                                                    😊
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setReplyingTo(msg)}
+                                                                    className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
+                                                                    title="Reply"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Reaction Picker */}
+                                                            {showReactionPicker === msg.id && (
+                                                                <div className={`absolute ${isOwn ? "right-0" : "left-0"} -top-10 z-10`}>
+                                                                    <QuickReactionPicker
+                                                                        isOpen={true}
+                                                                        onClose={() => setShowReactionPicker(null)}
+                                                                        onSelect={(emoji) => handleReaction(msg.id, emoji)}
+                                                                        emojis={ALPHA_REACTION_EMOJIS}
+                                                                    />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </motion.div>
                                                 );
@@ -571,6 +656,27 @@ export function AlphaChatModal({
                                         )}
                                         <div ref={messagesEndRef} />
                                     </div>
+
+                                    {/* Reply Preview */}
+                                    {replyingTo && (
+                                        <div className="px-4 py-2 bg-zinc-800/50 border-t border-zinc-700 flex items-center gap-2">
+                                            <div className="w-1 h-8 bg-orange-500 rounded-full" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs text-orange-400">
+                                                    Replying to {replyingTo.sender_address.toLowerCase() === userAddress.toLowerCase() ? "yourself" : formatSender(replyingTo.sender_address)}
+                                                </p>
+                                                <p className="text-xs text-zinc-400 truncate">{replyingTo.content}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setReplyingTo(null)}
+                                                className="w-6 h-6 flex items-center justify-center text-zinc-500 hover:text-white"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {/* Input */}
                                     <div className="p-4 border-t border-zinc-800">
@@ -605,7 +711,7 @@ export function AlphaChatModal({
                                                 value={newMessage}
                                                 onChange={(e) => setNewMessage(e.target.value)}
                                                 onKeyDown={handleKeyPress}
-                                                placeholder="Message the community..."
+                                                placeholder={replyingTo ? "Type your reply..." : "Message the community..."}
                                                 className="flex-1 py-3 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
                                             />
                                             <button

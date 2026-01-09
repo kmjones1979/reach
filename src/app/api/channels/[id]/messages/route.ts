@@ -13,6 +13,17 @@ export type ChannelMessage = {
     content: string;
     message_type: string;
     created_at: string;
+    reply_to_id?: string | null;
+    reply_to?: ChannelMessage | null;
+};
+
+export type ChannelReaction = {
+    id: string;
+    message_id: string;
+    channel_id: string;
+    user_address: string;
+    emoji: string;
+    created_at: string;
 };
 
 // GET /api/channels/[id]/messages - Get channel messages
@@ -26,7 +37,7 @@ export async function GET(
 
     let query = supabase
         .from("shout_channel_messages")
-        .select("*")
+        .select("*, reply_to:reply_to_id(id, sender_address, content, message_type)")
         .eq("channel_id", id)
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -45,8 +56,23 @@ export async function GET(
         );
     }
 
-    // Return in chronological order
-    return NextResponse.json({ messages: messages?.reverse() || [] });
+    // Fetch reactions for these messages
+    const messageIds = messages?.map(m => m.id) || [];
+    let reactions: ChannelReaction[] = [];
+    
+    if (messageIds.length > 0) {
+        const { data: reactionData } = await supabase
+            .from("shout_channel_reactions")
+            .select("*")
+            .in("message_id", messageIds);
+        reactions = reactionData || [];
+    }
+
+    // Return in chronological order with reactions
+    return NextResponse.json({ 
+        messages: messages?.reverse() || [],
+        reactions
+    });
 }
 
 // POST /api/channels/[id]/messages - Send a message
@@ -58,7 +84,7 @@ export async function POST(
 
     try {
         const body = await request.json();
-        const { senderAddress, content, messageType } = body;
+        const { senderAddress, content, messageType, replyToId } = body;
 
         if (!senderAddress || !content) {
             return NextResponse.json(
@@ -84,16 +110,22 @@ export async function POST(
             );
         }
 
-        // Insert message
+        // Insert message with optional reply_to
+        const insertData: Record<string, unknown> = {
+            channel_id: id,
+            sender_address: normalizedAddress,
+            content: content.trim(),
+            message_type: messageType || "text",
+        };
+        
+        if (replyToId) {
+            insertData.reply_to_id = replyToId;
+        }
+
         const { data: message, error } = await supabase
             .from("shout_channel_messages")
-            .insert({
-                channel_id: id,
-                sender_address: normalizedAddress,
-                content: content.trim(),
-                message_type: messageType || "text",
-            })
-            .select()
+            .insert(insertData)
+            .select("*, reply_to:reply_to_id(id, sender_address, content, message_type)")
             .single();
 
         if (error) {
@@ -112,6 +144,73 @@ export async function POST(
         console.error("[Channels API] Error:", e);
         return NextResponse.json(
             { error: "Failed to process request" },
+            { status: 500 }
+        );
+    }
+}
+
+// PATCH /api/channels/[id]/messages - Toggle reaction on a message
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id: channelId } = await params;
+
+    try {
+        const body = await request.json();
+        const { messageId, userAddress, emoji } = body;
+
+        if (!messageId || !userAddress || !emoji) {
+            return NextResponse.json(
+                { error: "Message ID, user address, and emoji are required" },
+                { status: 400 }
+            );
+        }
+
+        const normalizedAddress = userAddress.toLowerCase();
+
+        // Check if reaction already exists
+        const { data: existing } = await supabase
+            .from("shout_channel_reactions")
+            .select("id")
+            .eq("message_id", messageId)
+            .eq("user_address", normalizedAddress)
+            .eq("emoji", emoji)
+            .single();
+
+        if (existing) {
+            // Remove reaction
+            await supabase
+                .from("shout_channel_reactions")
+                .delete()
+                .eq("id", existing.id);
+            
+            return NextResponse.json({ action: "removed" });
+        } else {
+            // Add reaction
+            const { error } = await supabase
+                .from("shout_channel_reactions")
+                .insert({
+                    message_id: messageId,
+                    channel_id: channelId,
+                    user_address: normalizedAddress,
+                    emoji,
+                });
+
+            if (error) {
+                console.error("[Channels API] Error adding reaction:", error);
+                return NextResponse.json(
+                    { error: "Failed to add reaction" },
+                    { status: 500 }
+                );
+            }
+
+            return NextResponse.json({ action: "added" });
+        }
+    } catch (e) {
+        console.error("[Channels API] Reaction error:", e);
+        return NextResponse.json(
+            { error: "Failed to process reaction" },
             { status: 500 }
         );
     }

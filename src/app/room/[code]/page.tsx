@@ -935,8 +935,59 @@ export default function RoomPage({
 
             try {
                 await client.localPeer.enableVideo();
+                
+                // Fallback: If stream-playable doesn't fire within 2 seconds, try to get video manually
+                setTimeout(async () => {
+                    if (localVideoRef.current && !localVideoRef.current.srcObject) {
+                        console.log("[Room] Video stream not attached after 2s, attempting manual attach...");
+                        try {
+                            // Try to get the video track from the local peer
+                            const localPeer = client.localPeer;
+                            
+                            // Method 1: Try getStream
+                            if (typeof localPeer.getStream === "function") {
+                                const videoStream = await localPeer.getStream({ label: "video" });
+                                if (videoStream && localVideoRef.current) {
+                                    localVideoRef.current.srcObject = videoStream;
+                                    await localVideoRef.current.play().catch(() => {});
+                                    console.log("[Room] Manual video attach successful via getStream");
+                                    return;
+                                }
+                            }
+                            
+                            // Method 2: Try to get from getUserMedia directly as last resort
+                            console.log("[Room] Trying direct getUserMedia as fallback...");
+                            const stream = await navigator.mediaDevices.getUserMedia({ 
+                                video: true, 
+                                audio: false 
+                            });
+                            if (stream && localVideoRef.current) {
+                                localVideoRef.current.srcObject = stream;
+                                await localVideoRef.current.play().catch(() => {});
+                                console.log("[Room] Manual video attach successful via getUserMedia fallback");
+                            }
+                        } catch (manualErr) {
+                            console.warn("[Room] Manual video attach failed:", manualErr);
+                        }
+                    }
+                }, 2000);
             } catch (videoErr) {
                 console.warn("[Room] Could not enable video:", videoErr);
+                // Try getUserMedia directly as a fallback for email/passkey users
+                try {
+                    console.log("[Room] Trying direct getUserMedia fallback...");
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: true, 
+                        audio: false 
+                    });
+                    if (stream && localVideoRef.current) {
+                        localVideoRef.current.srcObject = stream;
+                        await localVideoRef.current.play().catch(() => {});
+                        console.log("[Room] getUserMedia fallback successful");
+                    }
+                } catch (fallbackErr) {
+                    console.warn("[Room] getUserMedia fallback also failed:", fallbackErr);
+                }
             }
 
             // Start duration timer
@@ -2456,7 +2507,7 @@ export default function RoomPage({
                                             autoPlay
                                             playsInline
                                             muted
-                                            className="w-full h-full min-h-0 object-cover"
+                                            className="w-full h-full min-h-0 object-contain bg-black"
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
