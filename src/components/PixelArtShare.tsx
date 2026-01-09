@@ -34,7 +34,7 @@ export function PixelArtShare({ imageUrl, className = "", compact = false, showQ
     const [isSharing, setIsSharing] = useState(false);
 
     const spritzUrl = "https://spritz.chat";
-    const callToAction = "🎨 Create your own pixel art on Spritz!";
+    const callToAction = "🍊 Create your own pixel art on Spritz!";
     
     // Extract IPFS hash to build shareable page URL
     const ipfsHash = useMemo(() => extractIpfsHash(imageUrl), [imageUrl]);
@@ -43,7 +43,7 @@ export function PixelArtShare({ imageUrl, className = "", compact = false, showQ
     // Quick share to X/Twitter (most common use case)
     const quickShareToX = (e: React.MouseEvent) => {
         e.stopPropagation();
-        const text = `Check out this pixel art I made on Spritz! 🎨✨\n\nCreate your own at spritz.chat`;
+        const text = `Check out this pixel art I saw on Spritz! 🍊\n\nCreate your own at spritz.chat`;
         const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareablePageUrl)}`;
         window.open(url, "_blank", "noopener,noreferrer");
     };
@@ -63,9 +63,9 @@ export function PixelArtShare({ imageUrl, className = "", compact = false, showQ
     // Build share text with image URL and call to action
     const buildShareText = (includeImage: boolean = true) => {
         if (includeImage) {
-            return `Check out my pixel art! 🎨✨\n\n${imageUrl}\n\n${callToAction}\n${spritzUrl}`;
+            return `Check out this pixel art I saw on Spritz! 🍊\n\n${imageUrl}\n\n${callToAction}\n${spritzUrl}`;
         }
-        return `Check out my pixel art! 🎨✨\n\n${callToAction}\n${spritzUrl}`;
+        return `Check out this pixel art I saw on Spritz! 🍊\n\n${callToAction}\n${spritzUrl}`;
     };
 
     // Use native Web Share API with file attachment (works on mobile!)
@@ -86,7 +86,7 @@ export function PixelArtShare({ imageUrl, className = "", compact = false, showQ
             if ("canShare" in navigator && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     title: "My Pixel Art",
-                    text: `Check out my pixel art! 🎨✨\n\n${callToAction}\n${spritzUrl}`,
+                    text: `Check out this pixel art I saw on Spritz! 🍊\n\n${callToAction}\n${spritzUrl}`,
                     files: [file],
                 });
                 setShowMenu(false);
@@ -111,7 +111,7 @@ export function PixelArtShare({ imageUrl, className = "", compact = false, showQ
 
     const shareToTwitter = () => {
         // Use the shareable page URL which has proper OG tags for Twitter card preview
-        const text = `Check out this pixel art I made on Spritz! 🎨✨\n\nCreate your own at spritz.chat`;
+        const text = `Check out this pixel art I saw on Spritz! 🍊\n\nCreate your own at spritz.chat`;
         const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareablePageUrl)}`;
         window.open(url, "_blank", "noopener,noreferrer");
         setShowMenu(false);
@@ -119,7 +119,7 @@ export function PixelArtShare({ imageUrl, className = "", compact = false, showQ
 
     const shareToFacebook = () => {
         // Use shareable page URL for proper OG tag previews
-        const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareablePageUrl)}&quote=${encodeURIComponent(`Check out my pixel art! ${callToAction}`)}`;
+        const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareablePageUrl)}&quote=${encodeURIComponent(`Check out this pixel art I saw on Spritz! 🍊 ${callToAction}`)}`;
         window.open(url, "_blank", "noopener,noreferrer");
         setShowMenu(false);
     };
@@ -133,21 +133,21 @@ export function PixelArtShare({ imageUrl, className = "", compact = false, showQ
 
     const shareToReddit = () => {
         // Use shareable page URL for proper preview
-        const title = `My pixel art created on Spritz! 🎨 Create your own at spritz.chat`;
+        const title = `Pixel art on Spritz! 🍊 Create your own at spritz.chat`;
         const url = `https://reddit.com/submit?url=${encodeURIComponent(shareablePageUrl)}&title=${encodeURIComponent(title)}`;
         window.open(url, "_blank", "noopener,noreferrer");
         setShowMenu(false);
     };
 
     const shareToTelegram = () => {
-        const text = `Check out my pixel art! 🎨✨\n\nCreate your own at spritz.chat`;
+        const text = `Check out this pixel art I saw on Spritz! 🍊\n\nCreate your own at spritz.chat`;
         const url = `https://t.me/share/url?url=${encodeURIComponent(shareablePageUrl)}&text=${encodeURIComponent(text)}`;
         window.open(url, "_blank", "noopener,noreferrer");
         setShowMenu(false);
     };
 
     const shareToWhatsApp = () => {
-        const text = `Check out my pixel art! 🎨✨\n\n${shareablePageUrl}\n\nCreate your own at spritz.chat`;
+        const text = `Check out this pixel art I saw on Spritz! 🍊\n\n${shareablePageUrl}\n\nCreate your own at spritz.chat`;
         const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
         window.open(url, "_blank", "noopener,noreferrer");
         setShowMenu(false);

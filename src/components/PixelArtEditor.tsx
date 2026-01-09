@@ -399,7 +399,7 @@ export function PixelArtEditor({
     };
 
     // Share functions
-    const shareText = "Check out my pixel art created on Spritz! 🎨✨";
+    const shareText = "Check out this pixel art I saw on Spritz! 🍊";
     const shareUrl = "https://spritz.chat";
 
     const shareToTwitter = () => {

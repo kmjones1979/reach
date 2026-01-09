@@ -20,7 +20,7 @@ export default function PixelArtPage() {
                 {/* Header */}
                 <div className="text-center mb-6">
                     <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-                        🎨 Pixel Art on Spritz
+                        🍊 Pixel Art on Spritz
                     </h1>
                     <p className="text-zinc-400">
                         Created with love on the decentralized web

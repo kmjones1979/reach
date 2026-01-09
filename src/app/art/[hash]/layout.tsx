@@ -9,12 +9,12 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { hash } = await params;
     
-    const pinataGateway = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "gateway.pinata.cloud";
-    const imageUrl = `https://${pinataGateway}/ipfs/${hash}`;
     const pageUrl = `https://spritz.chat/art/${hash}`;
+    // Use dynamic OG image that showcases the art in a nice card
+    const ogImageUrl = `https://spritz.chat/api/og/art/${hash}`;
     
-    const title = "Pixel Art on Spritz 🎨";
-    const description = "Check out this amazing pixel art created on Spritz! Create your own at spritz.chat";
+    const title = "Pixel Art on Spritz 🍊";
+    const description = "Check out this pixel art I saw on Spritz! 🍊 Create your own at spritz.chat";
     
     return {
         title,
@@ -26,9 +26,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             siteName: "Spritz",
             images: [
                 {
-                    url: imageUrl,
-                    width: 512,
-                    height: 512,
+                    url: ogImageUrl,
+                    width: 1200,
+                    height: 630,
                     alt: "Pixel Art created on Spritz",
                 },
             ],
@@ -39,12 +39,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             card: "summary_large_image",
             title,
             description,
-            images: [imageUrl],
+            images: [ogImageUrl],
             creator: "@spritz_chat",
         },
         other: {
             // Ensure Twitter fetches fresh image
-            "twitter:image:src": imageUrl,
+            "twitter:image:src": ogImageUrl,
         },
     };
 }
