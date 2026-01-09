@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ContactButton } from "./ContactButton";
 
 export const metadata: Metadata = {
     title: "Spritz - Censorship-Resistant Chat for Web3",
@@ -60,6 +61,7 @@ export default function LandingPage() {
                         >
                             GitHub
                         </a>
+                        <ContactButton className="text-zinc-400 hover:text-white font-medium transition-colors cursor-pointer" />
                         <a
                             href="https://app.spritz.chat"
                             className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#FF5500] to-[#e04d00] text-white font-semibold rounded-xl hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#FF5500]/30 transition-all"
@@ -332,6 +334,7 @@ export default function LandingPage() {
                         >
                             App
                         </a>
+                        <ContactButton className="text-zinc-400 hover:text-white text-sm transition-colors cursor-pointer" />
                         <Link
                             href="/privacy"
                             className="text-zinc-400 hover:text-white text-sm transition-colors"
