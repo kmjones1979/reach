@@ -11,7 +11,7 @@ export function PasskeyAuth() {
         isAuthenticated,
         smartAccountAddress,
         error,
-        hasStoredCredential,
+        hasStoredSession,
         register,
         login,
         logout,
@@ -128,7 +128,7 @@ export function PasskeyAuth() {
                 </div>
 
                 {/* Show hint if no credential stored */}
-                {mode === "login" && !hasStoredCredential && (
+                {mode === "login" && !hasStoredSession && (
                     <p className="text-amber-400/80 text-xs text-center">
                         No passkey found. Switch to Register to create one.
                     </p>
@@ -151,7 +151,7 @@ export function PasskeyAuth() {
                 <button
                     type="submit"
                     disabled={
-                        isLoading || (mode === "login" && !hasStoredCredential)
+                        isLoading || (mode === "login" && !hasStoredSession)
                     }
                     className="w-full relative overflow-hidden group py-4 px-6 rounded-xl bg-gradient-to-r from-[#FF5500] to-[#FF5500] text-white font-semibold transition-all hover:shadow-xl hover:shadow-[#FB8D22]/25 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
