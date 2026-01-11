@@ -502,24 +502,14 @@ export function PixelArtEditor({
         setCustomColor(rgbToHex(r, g, b));
     }, [hue, saturation, brightness]);
 
-    // Color wheel interaction
-    const handleWheelInteraction = useCallback((clientX: number, clientY: number) => {
-        const wheel = colorWheelRef.current;
-        if (!wheel) return;
+    // Hue slider interaction (linear bar)
+    const handleWheelInteraction = useCallback((clientX: number) => {
+        const slider = colorWheelRef.current;
+        if (!slider) return;
 
-        const rect = wheel.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        const x = clientX - centerX;
-        const y = clientY - centerY;
-
-        // Calculate angle (hue)
-        // atan2 gives angle from right (0°) going counter-clockwise
-        // CSS conic-gradient from 0deg starts from top going clockwise
-        // So we need to rotate by 90° to align them
-        let angle = Math.atan2(y, x) * (180 / Math.PI);
-        angle = (angle + 90 + 360) % 360;
-        setHue(angle);
+        const rect = slider.getBoundingClientRect();
+        const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+        setHue((x / rect.width) * 360);
     }, []);
 
     // Saturation/Brightness interaction
@@ -535,17 +525,6 @@ export function PixelArtEditor({
         setBrightness(Math.round(100 - (y / rect.height) * 100));
     }, []);
 
-    // Mouse/Touch handlers for color wheel
-    const handleWheelMouseDown = (e: React.MouseEvent) => {
-        setIsDraggingWheel(true);
-        handleWheelInteraction(e.clientX, e.clientY);
-    };
-
-    const handleWheelTouchStart = (e: React.TouchEvent) => {
-        setIsDraggingWheel(true);
-        handleWheelInteraction(e.touches[0].clientX, e.touches[0].clientY);
-    };
-
     // Mouse/Touch handlers for sat/bright panel
     const handleSatBrightMouseDown = (e: React.MouseEvent) => {
         setIsDraggingSatBright(true);
@@ -560,7 +539,7 @@ export function PixelArtEditor({
     // Global mouse/touch move and up handlers
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
-            if (isDraggingWheel) handleWheelInteraction(e.clientX, e.clientY);
+            if (isDraggingWheel) handleWheelInteraction(e.clientX);
             if (isDraggingSatBright) handleSatBrightInteraction(e.clientX, e.clientY);
         };
 
@@ -568,7 +547,7 @@ export function PixelArtEditor({
             if (isDraggingWheel || isDraggingSatBright) {
                 e.preventDefault();
             }
-            if (isDraggingWheel) handleWheelInteraction(e.touches[0].clientX, e.touches[0].clientY);
+            if (isDraggingWheel) handleWheelInteraction(e.touches[0].clientX);
             if (isDraggingSatBright) handleSatBrightInteraction(e.touches[0].clientX, e.touches[0].clientY);
         };
 
@@ -821,115 +800,154 @@ export function PixelArtEditor({
                                     className="overflow-hidden mb-3"
                                 >
                                     <div className="p-4 bg-zinc-800 rounded-lg">
-                                        <div className="flex flex-col sm:flex-row items-center gap-4">
-                                            {/* Color Wheel */}
+                                        {/* Large Saturation/Brightness Panel - Main picker */}
+                                        <div
+                                            ref={satBrightRef}
+                                            className="relative w-full h-40 sm:h-48 rounded-lg cursor-crosshair touch-none mb-4"
+                                            style={{
+                                                background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hue}, 100%, 50%))`,
+                                            }}
+                                            onMouseDown={handleSatBrightMouseDown}
+                                            onTouchStart={handleSatBrightTouchStart}
+                                        >
+                                            {/* Saturation/Brightness indicator */}
                                             <div
-                                                ref={colorWheelRef}
-                                                className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-full cursor-crosshair touch-none flex-shrink-0"
+                                                className="absolute w-5 h-5 border-2 border-white rounded-full pointer-events-none"
                                                 style={{
-                                                    background: "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+                                                    left: `calc(${saturation}% - 10px)`,
+                                                    top: `calc(${100 - brightness}% - 10px)`,
+                                                    backgroundColor: customColor,
+                                                    boxShadow: "0 0 0 2px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3)",
                                                 }}
-                                                onMouseDown={handleWheelMouseDown}
-                                                onTouchStart={handleWheelTouchStart}
-                                            >
-                                                {/* White to transparent overlay for brightness effect */}
-                                                <div className="absolute inset-0 rounded-full" style={{ background: "radial-gradient(circle, white 0%, transparent 70%)" }} />
-                                                {/* Hue indicator */}
-                                                <div
-                                                    className="absolute w-4 h-4 border-2 border-white rounded-full shadow-lg"
-                                                    style={{
-                                                        // Subtract 90° to convert from hue angle to visual position
-                                                        // (hue 0° = red at top, but cos/sin 0° = right)
-                                                        left: `calc(50% + ${Math.cos(((hue - 90) * Math.PI) / 180) * 48}px - 8px)`,
-                                                        top: `calc(50% + ${Math.sin(((hue - 90) * Math.PI) / 180) * 48}px - 8px)`,
-                                                        backgroundColor: `hsl(${hue}, 100%, 50%)`,
-                                                        boxShadow: "0 0 0 2px rgba(0,0,0,0.5)",
-                                                    }}
-                                                />
-                                            </div>
+                                            />
+                                        </div>
 
-                                            {/* Saturation & Brightness Panel */}
-                                            <div className="flex-1 w-full sm:w-auto">
+                                        {/* Hue Slider Bar */}
+                                        <div className="mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs text-zinc-400 w-8 shrink-0">Hue</span>
                                                 <div
-                                                    ref={satBrightRef}
-                                                    className="relative w-full h-28 sm:h-32 rounded-lg cursor-crosshair touch-none"
+                                                    ref={colorWheelRef}
+                                                    className="relative flex-1 h-6 rounded-lg cursor-crosshair touch-none"
                                                     style={{
-                                                        background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hue}, 100%, 50%))`,
+                                                        background: "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
                                                     }}
-                                                    onMouseDown={handleSatBrightMouseDown}
-                                                    onTouchStart={handleSatBrightTouchStart}
+                                                    onMouseDown={(e) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                                                        setHue((x / rect.width) * 360);
+                                                        setIsDraggingWheel(true);
+                                                    }}
+                                                    onTouchStart={(e) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const x = Math.max(0, Math.min(e.touches[0].clientX - rect.left, rect.width));
+                                                        setHue((x / rect.width) * 360);
+                                                        setIsDraggingWheel(true);
+                                                    }}
                                                 >
-                                                    {/* Saturation/Brightness indicator */}
+                                                    {/* Hue indicator */}
                                                     <div
-                                                        className="absolute w-4 h-4 border-2 border-white rounded-full"
+                                                        className="absolute w-2 h-8 -top-1 border-2 border-white rounded-sm pointer-events-none"
                                                         style={{
-                                                            left: `calc(${saturation}% - 8px)`,
-                                                            top: `calc(${100 - brightness}% - 8px)`,
-                                                            backgroundColor: customColor,
-                                                            boxShadow: "0 0 0 2px rgba(0,0,0,0.5)",
+                                                            left: `calc(${(hue / 360) * 100}% - 4px)`,
+                                                            backgroundColor: `hsl(${hue}, 100%, 50%)`,
+                                                            boxShadow: "0 0 0 1px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3)",
                                                         }}
                                                     />
                                                 </div>
-
-                                                {/* Color preview and hex input */}
-                                                <div className="flex items-center gap-2 mt-3">
-                                                    <div
-                                                        className="w-10 h-10 rounded-lg border-2 border-zinc-600 flex-shrink-0"
-                                                        style={{ backgroundColor: customColor }}
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={customColor}
-                                                        onChange={(e) => {
-                                                            const hex = e.target.value;
-                                                            setCustomColor(hex);
-                                                            const rgb = hexToRgb(hex);
-                                                            if (rgb) {
-                                                                const [h, s, v] = rgbToHsv(...rgb);
-                                                                setHue(h);
-                                                                setSaturation(Math.round(s * 100));
-                                                                setBrightness(Math.round(v * 100));
-                                                            }
-                                                        }}
-                                                        className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-white text-sm font-mono"
-                                                        placeholder="#ff0000"
-                                                    />
-                                                    <button
-                                                        onClick={applyCustomColor}
-                                                        className="px-4 py-2 bg-[#FF5500] hover:bg-[#FB8D22] text-white text-sm rounded-lg transition-colors font-medium"
-                                                    >
-                                                        Use
-                                                    </button>
-                                                </div>
+                                                <span className="text-xs text-zinc-400 w-10 text-right shrink-0">{Math.round(hue)}°</span>
                                             </div>
                                         </div>
 
-                                        {/* Quick brightness/saturation sliders for mobile */}
-                                        <div className="mt-4 space-y-2 sm:hidden">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-zinc-400 w-8">Sat</span>
-                                                <input
-                                                    type="range"
-                                                    min="0"
-                                                    max="100"
-                                                    value={saturation}
-                                                    onChange={(e) => setSaturation(Number(e.target.value))}
-                                                    className="flex-1 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                                                />
-                                                <span className="text-xs text-zinc-400 w-8">{saturation}%</span>
+                                        {/* Saturation & Brightness Sliders */}
+                                        <div className="space-y-3 mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs text-zinc-400 w-8 shrink-0">Sat</span>
+                                                <div className="relative flex-1 h-4 rounded-lg cursor-pointer touch-none"
+                                                    style={{
+                                                        background: `linear-gradient(to right, hsl(${hue}, 0%, ${brightness / 2}%), hsl(${hue}, 100%, ${50 * brightness / 100}%))`,
+                                                    }}
+                                                    onMouseDown={(e) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                                                        setSaturation(Math.round((x / rect.width) * 100));
+                                                    }}
+                                                    onTouchStart={(e) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const x = Math.max(0, Math.min(e.touches[0].clientX - rect.left, rect.width));
+                                                        setSaturation(Math.round((x / rect.width) * 100));
+                                                    }}
+                                                >
+                                                    <div
+                                                        className="absolute w-3 h-6 -top-1 border-2 border-white rounded-sm pointer-events-none"
+                                                        style={{
+                                                            left: `calc(${saturation}% - 6px)`,
+                                                            backgroundColor: `hsl(${hue}, ${saturation}%, ${50 * brightness / 100}%)`,
+                                                            boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-zinc-400 w-10 text-right shrink-0">{saturation}%</span>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-zinc-400 w-8">Brt</span>
-                                                <input
-                                                    type="range"
-                                                    min="0"
-                                                    max="100"
-                                                    value={brightness}
-                                                    onChange={(e) => setBrightness(Number(e.target.value))}
-                                                    className="flex-1 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                                                />
-                                                <span className="text-xs text-zinc-400 w-8">{brightness}%</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs text-zinc-400 w-8 shrink-0">Brt</span>
+                                                <div className="relative flex-1 h-4 rounded-lg cursor-pointer touch-none"
+                                                    style={{
+                                                        background: `linear-gradient(to right, #000, hsl(${hue}, ${saturation}%, 50%))`,
+                                                    }}
+                                                    onMouseDown={(e) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                                                        setBrightness(Math.round((x / rect.width) * 100));
+                                                    }}
+                                                    onTouchStart={(e) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const x = Math.max(0, Math.min(e.touches[0].clientX - rect.left, rect.width));
+                                                        setBrightness(Math.round((x / rect.width) * 100));
+                                                    }}
+                                                >
+                                                    <div
+                                                        className="absolute w-3 h-6 -top-1 border-2 border-white rounded-sm pointer-events-none"
+                                                        style={{
+                                                            left: `calc(${brightness}% - 6px)`,
+                                                            backgroundColor: customColor,
+                                                            boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-zinc-400 w-10 text-right shrink-0">{brightness}%</span>
                                             </div>
+                                        </div>
+
+                                        {/* Color preview and hex input */}
+                                        <div className="flex items-center gap-2">
+                                            <div
+                                                className="w-12 h-12 rounded-lg border-2 border-zinc-600 shrink-0"
+                                                style={{ backgroundColor: customColor }}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={customColor}
+                                                onChange={(e) => {
+                                                    const hex = e.target.value;
+                                                    setCustomColor(hex);
+                                                    const rgb = hexToRgb(hex);
+                                                    if (rgb) {
+                                                        const [h, s, v] = rgbToHsv(...rgb);
+                                                        setHue(h);
+                                                        setSaturation(Math.round(s * 100));
+                                                        setBrightness(Math.round(v * 100));
+                                                    }
+                                                }}
+                                                className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2.5 text-white text-sm font-mono"
+                                                placeholder="#ff0000"
+                                            />
+                                            <button
+                                                onClick={applyCustomColor}
+                                                className="px-5 py-2.5 bg-[#FF5500] hover:bg-[#FB8D22] text-white text-sm rounded-lg transition-colors font-medium"
+                                            >
+                                                Use
+                                            </button>
                                         </div>
                                     </div>
                                 </motion.div>
