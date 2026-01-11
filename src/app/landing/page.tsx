@@ -210,11 +210,6 @@ export default function LandingPage() {
                                 <circle cx="20" cy="16" r="3"/>
                             </svg>
                         </TechLogo>
-                        <TechLogo name="Supabase" href="https://supabase.com">
-                            <svg viewBox="0 0 32 32" className="w-8 h-8">
-                                <path d="M17.5 28.5c-.5.7-1.6.3-1.6-.6V18h10.7c1.2 0 1.8-1.4 1.1-2.3L17.5 3.5c-.5-.7-1.6-.3-1.6.6V14H5.2c-1.2 0-1.8 1.4-1.1 2.3l10.2 12.2z" fill="currentColor"/>
-                            </svg>
-                        </TechLogo>
                         <TechLogo name="Next.js" href="https://nextjs.org">
                             <svg viewBox="0 0 32 32" className="w-8 h-8" fill="currentColor">
                                 <path d="M16 2C8.3 2 2 8.3 2 16s6.3 14 14 14 14-6.3 14-14S23.7 2 16 2zm5.9 20.1l-8.4-11v8.4h-1.3V10.3h1.1l8.1 10.6V10.5h1.3v11.6h-.8z"/>

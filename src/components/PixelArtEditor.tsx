@@ -496,11 +496,16 @@ export function PixelArtEditor({
         }
     }, [showShareMenu]);
 
-    // Update custom color when HSV changes
+    // Update custom color and selected color when HSV changes
     useEffect(() => {
         const [r, g, b] = hsvToRgb(hue, saturation / 100, brightness / 100);
-        setCustomColor(rgbToHex(r, g, b));
-    }, [hue, saturation, brightness]);
+        const newColor = rgbToHex(r, g, b);
+        setCustomColor(newColor);
+        // Auto-apply color when picker is open
+        if (showColorPicker) {
+            setSelectedColor(newColor);
+        }
+    }, [hue, saturation, brightness, showColorPicker]);
 
     // Hue slider interaction (linear bar)
     const handleWheelInteraction = useCallback((clientX: number) => {
@@ -570,12 +575,6 @@ export function PixelArtEditor({
             document.removeEventListener("touchend", handleEnd);
         };
     }, [isDraggingWheel, isDraggingSatBright, handleWheelInteraction, handleSatBrightInteraction]);
-
-    // Apply custom color
-    const applyCustomColor = () => {
-        setSelectedColor(customColor);
-        setShowColorPicker(false);
-    };
 
     return (
         <AnimatePresence>
@@ -942,12 +941,6 @@ export function PixelArtEditor({
                                                 className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2.5 text-white text-sm font-mono"
                                                 placeholder="#ff0000"
                                             />
-                                            <button
-                                                onClick={applyCustomColor}
-                                                className="px-5 py-2.5 bg-[#FF5500] hover:bg-[#FB8D22] text-white text-sm rounded-lg transition-colors font-medium"
-                                            >
-                                                Use
-                                            </button>
                                         </div>
                                     </div>
                                 </motion.div>
