@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCloudProof, type IVerifyResponse } from "@worldcoin/idkit-core/backend";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 export async function POST(request: NextRequest) {
+    // Rate limit: 10 requests per minute for auth
+    const rateLimitResponse = await checkRateLimit(request, "auth");
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const proof = await request.json();
         

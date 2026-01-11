@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 import { createClient } from "@supabase/supabase-js";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -33,6 +34,10 @@ function getAllowedOrigins(): string[] {
 }
 
 export async function POST(request: NextRequest) {
+    // Rate limit: 10 requests per minute for auth
+    const rateLimitResponse = await checkRateLimit(request, "auth");
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const { 
             credential,

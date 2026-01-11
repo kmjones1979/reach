@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 // Initialize web-push with VAPID keys
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -21,6 +22,10 @@ const supabase =
         : null;
 
 export async function POST(request: NextRequest) {
+    // Rate limit: 60 requests per minute for messaging/notifications
+    const rateLimitResponse = await checkRateLimit(request, "messaging");
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
             return NextResponse.json(

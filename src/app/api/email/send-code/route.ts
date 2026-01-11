@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey =
@@ -19,6 +20,10 @@ function generateCode(): string {
 }
 
 export async function POST(request: NextRequest) {
+    // Rate limit: 5 requests per minute for email sending (strict)
+    const rateLimitResponse = await checkRateLimit(request, "strict");
+    if (rateLimitResponse) return rateLimitResponse;
+
     if (!supabase) {
         return NextResponse.json(
             { error: "Database not configured" },

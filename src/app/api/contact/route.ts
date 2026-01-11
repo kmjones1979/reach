@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 const resendApiKey = process.env.RESEND_API_KEY;
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 export async function POST(request: NextRequest) {
+    // Rate limit: 3 requests per minute for contact form
+    const rateLimitResponse = await checkRateLimit(request, "contact");
+    if (rateLimitResponse) return rateLimitResponse;
+
     if (!resend) {
         return NextResponse.json(
             { error: "Email service not configured" },

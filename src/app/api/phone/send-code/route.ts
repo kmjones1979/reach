@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 // Lazy initialization of Supabase client
 let supabase: SupabaseClient | null = null;
@@ -63,6 +64,10 @@ function normalizePhone(phone: string): string {
 }
 
 export async function POST(request: NextRequest) {
+    // Rate limit: 5 requests per minute for phone verification (strict)
+    const rateLimitResponse = await checkRateLimit(request, "strict");
+    if (rateLimitResponse) return rateLimitResponse;
+
     try {
         const twilio = getTwilioConfig();
         const db = getSupabase();

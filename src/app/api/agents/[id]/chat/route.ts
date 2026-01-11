@@ -4,6 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { google } from "googleapis";
 import { localTimeToUTC, getDayOfWeekInTimezone } from "@/lib/timezone";
 import { toZonedTime, format } from "date-fns-tz";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -325,6 +326,10 @@ export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    // Rate limit: 30 requests per minute for AI chat
+    const rateLimitResponse = await checkRateLimit(request, "ai");
+    if (rateLimitResponse) return rateLimitResponse;
+
     if (!supabase) {
         return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     }

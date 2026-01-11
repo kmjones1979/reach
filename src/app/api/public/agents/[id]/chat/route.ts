@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
 import { requireX402Payment, type X402Config } from "@/lib/x402";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -86,6 +87,10 @@ export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    // Rate limit: 30 requests per minute for AI chat
+    const rateLimitResponse = await checkRateLimit(request, "ai");
+    if (rateLimitResponse) return rateLimitResponse;
+
     if (!supabase || !ai) {
         return NextResponse.json({ error: "Service not configured" }, { status: 500 });
     }
