@@ -514,8 +514,11 @@ export function PixelArtEditor({
         const y = clientY - centerY;
 
         // Calculate angle (hue)
+        // atan2 gives angle from right (0°) going counter-clockwise
+        // CSS conic-gradient from 0deg starts from top going clockwise
+        // So we need to rotate by 90° to align them
         let angle = Math.atan2(y, x) * (180 / Math.PI);
-        angle = (angle + 360) % 360;
+        angle = (angle + 90 + 360) % 360;
         setHue(angle);
     }, []);
 
@@ -835,8 +838,10 @@ export function PixelArtEditor({
                                                 <div
                                                     className="absolute w-4 h-4 border-2 border-white rounded-full shadow-lg"
                                                     style={{
-                                                        left: `calc(50% + ${Math.cos((hue * Math.PI) / 180) * 48}px - 8px)`,
-                                                        top: `calc(50% + ${Math.sin((hue * Math.PI) / 180) * 48}px - 8px)`,
+                                                        // Subtract 90° to convert from hue angle to visual position
+                                                        // (hue 0° = red at top, but cos/sin 0° = right)
+                                                        left: `calc(50% + ${Math.cos(((hue - 90) * Math.PI) / 180) * 48}px - 8px)`,
+                                                        top: `calc(50% + ${Math.sin(((hue - 90) * Math.PI) / 180) * 48}px - 8px)`,
                                                         backgroundColor: `hsl(${hue}, 100%, 50%)`,
                                                         boxShadow: "0 0 0 2px rgba(0,0,0,0.5)",
                                                     }}

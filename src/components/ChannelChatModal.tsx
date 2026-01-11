@@ -230,6 +230,24 @@ export function ChannelChatModal({
                     {/* Header */}
                     <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
                         <div className="flex items-center gap-3">
+                            <button
+                                onClick={onClose}
+                                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                            >
+                                <svg
+                                    className="w-5 h-5 text-zinc-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M15 19l-7-7 7-7"
+                                    />
+                                </svg>
+                            </button>
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center text-xl">
                                 {channel.emoji}
                             </div>
@@ -275,7 +293,7 @@ export function ChannelChatModal({
                                 className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
                             >
                                 <svg
-                                    className="w-5 h-5 text-zinc-400"
+                                    className="w-6 h-6 text-zinc-400"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"

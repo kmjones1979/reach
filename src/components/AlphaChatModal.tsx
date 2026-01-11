@@ -438,7 +438,7 @@ export function AlphaChatModal({
                                     className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
                                 >
                                     <svg
-                                        className="w-5 h-5 text-zinc-400"
+                                        className="w-6 h-6 text-zinc-400"
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
